@@ -4,14 +4,14 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puckGroundSensors.proto"
 
 WorldInfo {
+  basicTimeStep 20
   title "curriculum_beginner_linear_camera"
 }
 Viewpoint {
-  orientation 0.13890329776140298 -0.09811351801129416 -0.985433717433321 2.967909470567669
-  position 0.6977677065765768 0.47062952010957276 0.1428448182188366
+  orientation 0.10379422173432151 -0.09449992096578902 -0.9900992498088392 2.8085746718453986
+  position 2.025360317652362 0.6238261092975468 0.430616793024692
 }
 TexturedBackground {
 }
@@ -33,13 +33,14 @@ RectangleArena {
 }
 DEF E_PUCK E-puck {
   translation 0 0.44 0
-  controller "obstacle"
+  controller "my_controller"
   window "botstudio"
   camera_width 40
   camera_height 1
   camera_rotation 0 1 0 0.47
   turretSlot [
-    E-puckGroundSensors {
+    DistanceSensor {
+      name "distance_sensor_1"
     }
   ]
 }
