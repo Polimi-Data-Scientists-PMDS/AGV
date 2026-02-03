@@ -17,6 +17,10 @@ timestep = int(robot.getBasicTimeStep())
 # ds = robot.getDevice('dsname')
 #  ds.enable(timestep)
 
+# Setup distance sensor
+ds1 = robot.getDevice('distance_sensor_1')
+ds1.enable(1000)
+
 motorL = robot.getDevice('left wheel motor')
 motorR = robot.getDevice('right wheel motor')
 
@@ -28,12 +32,18 @@ motorR.setPosition(float('inf'))
 MAX_SPEED = 6.28
 speed = 0.5 * MAX_SPEED
 
+# Variables for printing the sensor value every 1 second 
+last_print_time = 0.0
+
 # Main loop:
 # - perform simulation steps until Webots is stopping the controller
 while robot.step(timestep) != -1:
-    # Read the sensors:
-    # Enter here functions to read sensor data, like:
-    # val = ds.getValue()
+    # Read and print the sensor value every 1 second 
+    current_time = robot.getTime()
+    if current_time - last_print_time >= 1.0:
+        val1 = ds1.getValue()
+        print(f"The distance mesured by the distance sensor 1 at time {current_time}s is: {val1}")
+        last_print_time = current_time
 
     
     if robot.getTime() < 10.0:
