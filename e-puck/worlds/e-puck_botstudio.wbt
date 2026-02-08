@@ -6,7 +6,7 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 
 WorldInfo {
   title "curriculum_beginner_linear_camera"
-  basicTimeStep 20
+  basicTimeStep 5
 }
 Viewpoint {
   orientation -0.23162039827946973 0.48179507275394423 0.8451186301170276 1.034398262233093
@@ -57,8 +57,8 @@ DEF E_PUCK Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.026 0.02
-        rotation 0 1 0 0
+        translation -1.1738973477958907e-05 0.025942822324901745 0.020029166321597746
+        rotation 0.7802271397156846 -3.3048561764607304e-05 0.6254962904437358 6.2831616701988455
         children [
           DEF EPUCK_WHEEL Pose {
             rotation 1 0 0 -1.570796
@@ -209,8 +209,8 @@ DEF E_PUCK Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.026 0.02
-        rotation 0 1 0 0
+        translation 3.6366195965442696e-05 -0.025934341290869356 0.01998660732326371
+        rotation -0.8158356616863015 7.242886728915923e-06 -0.5782838170556177 2.5933586405795298e-05
         children [
           Pose {
             rotation 1 0 0 3.14159
@@ -1608,7 +1608,7 @@ DEF E_PUCK Robot {
   }
   physics Physics {
     density -1
-    mass 0.15
+    mass 10
     centerOfMass [
       0 0 0.015
     ]
