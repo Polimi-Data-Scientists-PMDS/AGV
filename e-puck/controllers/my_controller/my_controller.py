@@ -1,61 +1,81 @@
 """my_controller controller."""
 
-# You may need to import some classes of the controller module. Ex:
-#  from controller import Robot, Motor, DistanceSensor
-from controller import Robot
+from controller import Robot 
+#Error due to library used by webots and not imported locally
 import numpy as np 
+import time
 
-# create the Robot instance.
+DISTANCE_BETWEEN_WHEELS = 0.052 #(m) distance between wheels to be found in the robot manual
+WHEEL_RADIUS = 0.02 #(m) wheel radius to be found in the robot manual
+MAX_WHEEL_SPEED = 6.28 #(rad/s) actual max speed is 100, this setting is to not overspeed the robot
+
+# Function to set the wheel velocity
+def set_wheel_velocity(lin_vel, ang_vel):
+    # from set linear and angular velocity to wheel linear velocity
+    v_r = lin_vel + 0.5 * ang_vel * DISTANCE_BETWEEN_WHEELS
+    v_l = lin_vel - 0.5 * ang_vel * DISTANCE_BETWEEN_WHEELS
+
+    # linear -> angular (rad/s)
+    w_r = v_r / WHEEL_RADIUS
+    w_l = v_l / WHEEL_RADIUS
+
+    # saturation to preserve curvature
+    scale = max(abs(w_l), abs(w_r)) / MAX_WHEEL_SPEED
+
+    if scale > 1.0:
+        w_l /= scale
+        w_r /= scale
+
+    #print(f"Giving motor velocities: L: {w_l}, R: {w_r}")
+    
+    # set motor velocity
+    motorL.setVelocity(w_l)
+    motorR.setVelocity(w_r)
+
+
+# create the Robot instance
 robot = Robot()
-
-# get the time step of the current world.
-timestep = int(robot.getBasicTimeStep())
-
-# You should insert a getDevice-like function in order to get the
-# instance of a device of the robot. Something like:
-#  motor = robot.getDevice('motorname')
-# ds = robot.getDevice('dsname')
-#  ds.enable(timestep)
-
-# Setup distance sensor
-ds1 = robot.getDevice('distance_sensor_1')
-ds1.enable(1000)
-
+# get the time step of the current world
+timestep = int(robot.getBasicTimeStep()) #(ms) currently timestep is 20ms
+# Get motor devices
 motorL = robot.getDevice('left wheel motor')
 motorR = robot.getDevice('right wheel motor')
+
+# Setup distance sensor 
+ds1 = robot.getDevice('distance_sensor_1')
+# enable distance sensor with 10*timestep (200ms) in order to have a good precision
+ds1.enable(10*timestep)
+
 
 # Set the motors to rotate indefinitely for velocity control
 motorL.setPosition(float('inf'))
 motorR.setPosition(float('inf'))
 
-# Set the target velocity (e.g., 50% of max speed which is 2*pi)
-MAX_SPEED = 6.28
-speed = 0.5 * MAX_SPEED
-
 # Variables for printing the sensor value every 1 second 
 last_print_time = 0.0
+
 
 # Main loop:
 # - perform simulation steps until Webots is stopping the controller
 while robot.step(timestep) != -1:
     # Read and print the sensor value every 1 second 
     current_time = robot.getTime()
+    dist = ds1.getValue()
     if current_time - last_print_time >= 1.0:
-        val1 = ds1.getValue()
-        print(f"The distance mesured by the distance sensor 1 at time {current_time}s is: {val1}")
+        print(f"The distance mesured by the distance sensor 1 at time {current_time}s is: {dist}")
         last_print_time = current_time
 
-    
-    if robot.getTime() < 10.0:
-        motorL.setVelocity(0.0)
-    else:
-        motorL.setVelocity(speed)
-    motorR.setVelocity(speed)
+    # Simple obstacle avoidance
+    if dist < 200:
+        set_wheel_velocity(0, 10)
+    else: 
+        set_wheel_velocity(1.5, 0)
 
-    # Process sensor data here.
-
-    # Enter here functions to send actuator commands, like:
-    #  motor.setPosition(10.0)
     pass
 
 # Enter here exit cleanup code.
+
+
+
+
+
