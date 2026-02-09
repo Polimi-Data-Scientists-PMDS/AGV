@@ -6,11 +6,11 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 
 WorldInfo {
   title "curriculum_beginner_linear_camera"
-  basicTimeStep 5
+  basicTimeStep 10
 }
 Viewpoint {
-  orientation -0.23162039827946973 0.48179507275394423 0.8451186301170276 1.034398262233093
-  position -1.7210434866822268 -3.1465907325401643 2.2263813302894313
+  orientation -0.38984942888521423 0.3403215108521478 0.8556860943413676 1.8584660617104751
+  position 0.9556485497712871 -2.8307826568455248 3.824064845364735
 }
 TexturedBackground {
 }
@@ -31,7 +31,7 @@ RectangleArena {
   }
 }
 DEF E_PUCK Robot {
-  translation 0.523719 0.443677 -6.08428e-15
+  translation -0.660612 0.404509 1.05412e-14
   children [
     DistanceSensor {
       name "distance_sensor_1"
@@ -1608,7 +1608,7 @@ DEF E_PUCK Robot {
   }
   physics Physics {
     density -1
-    mass 10
+    mass 1
     centerOfMass [
       0 0 0.015
     ]
