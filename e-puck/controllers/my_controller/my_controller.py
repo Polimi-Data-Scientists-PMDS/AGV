@@ -32,6 +32,22 @@ def set_wheel_velocity(lin_vel, ang_vel):
     motorL.setVelocity(w_l)
     motorR.setVelocity(w_r)
 
+# Function to get the current linear speed
+def get_current_linear_speed():
+    w_r = motorR.getVelocity()
+    w_l = motorL.getVelocity()
+    v_r = w_r * WHEEL_RADIUS
+    v_l = w_l * WHEEL_RADIUS
+    lin_vel = (v_r + v_l) / 2
+    return lin_vel
+
+# Function for linear acceleration
+def acc_speed(target_speed, current_speed, delta_time, time_to_target):
+    if current_speed <= target_speed:
+        delta_vel = (target_speed - current_speed) / delta_time
+    elif current_speed > target_speed:
+        delta_vel = (target_speed - current_speed) / delta_time
+    return current_speed + delta_vel*time_to_target
 
 # create the Robot instance
 robot = Robot()
@@ -44,7 +60,7 @@ motorR = robot.getDevice('right wheel motor')
 # Setup distance sensor 
 ds1 = robot.getDevice('distance_sensor_1')
 # enable distance sensor with in order to have a good precision
-ds1.enable(10*timestep)
+ds1.enable(timestep)
 
 
 # Set the motors to rotate indefinitely for velocity control
@@ -54,8 +70,9 @@ motorR.setPosition(float('inf'))
 # Variables for printing the sensor value every 1 second 
 last_print_time = 0.0
 
-# Create variable to not have inst. acceleration
-count = -1
+# Variables for acceleration
+OBSTACLE_DECELERATION_TIME = 1 #(s)
+time_to_target = 0.0
 
 # Main loop:
 # - perform simulation steps until Webots is stopping the controller
@@ -71,17 +88,26 @@ while robot.step(timestep) != -1:
         w_l = motorL.getVelocity()
         print(f"Wheel speeds: L: {w_l}, R: {w_r}")
 
+    # set_wheel_velocity(0.1, 0)
+
     # Simple obstacle avoidance with deceleration and acceleration
     if dist < 500:
-        set_wheel_velocity(0.25, -5)
-        count = 50
-    elif dist < 750 and count == -1: 
-        set_wheel_velocity(0.5, -1.5)
-    elif count >= 0:
-        set_wheel_velocity(0.5, -1.5)
-        count -= 1
+        set_wheel_velocity(0.1, -5)
+        time_to_target = 0.0
+    elif dist < 750: 
+        current_speed = get_current_linear_speed()
+        time_to_target += 0.010
+        new_speed = acc_speed(0.1, current_speed, OBSTACLE_DECELERATION_TIME, time_to_target)
+        set_wheel_velocity(new_speed, 0)
     else:
-        set_wheel_velocity(0.75, -1.5)
+        current_speed = get_current_linear_speed()
+        if current_speed < 0.1:
+            time_to_target += 0.010
+            new_speed = acc_speed(0.1, current_speed, OBSTACLE_DECELERATION_TIME, time_to_target)
+            set_wheel_velocity(new_speed, 0)
+        else:
+            time_to_target = 0.0
+            set_wheel_velocity(0.1, 0)
 
     pass
 
