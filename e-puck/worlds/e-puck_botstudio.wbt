@@ -3,20 +3,22 @@
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/containers/protos/CardboardBox.proto"
 
 WorldInfo {
   title "curriculum_beginner_linear_camera"
   basicTimeStep 10
 }
 Viewpoint {
-  orientation -0.38984942888521423 0.3403215108521478 0.8556860943413676 1.8584660617104751
-  position 0.9556485497712871 -2.8307826568455248 3.824064845364735
+  orientation 0.5905395287543839 -0.635851371506253 -0.49694677615632804 4.12422083897907
+  position 0.29876087646169197 0.9296287228757358 5.610184878009679
 }
 TexturedBackground {
 }
 TexturedBackgroundLight {
 }
 RectangleArena {
+  translation 0.197765 0.115667 0.2
   rotation 0 0 1 -1.5707953071795862
   floorSize 1.2 1.8
   floorTileSize 1.2 1.8
@@ -31,8 +33,15 @@ RectangleArena {
   }
 }
 DEF E_PUCK Robot {
-  translation -0.660612 0.404509 1.05412e-14
+  translation -0.660612 0.404509 0.2
   children [
+    Lidar {
+      translation 0 0 0.05
+      name "Lidar1"
+      horizontalResolution 360
+      fieldOfView 3.15
+      maxRange 2
+    }
     DistanceSensor {
       name "distance_sensor_1"
       lookupTable [
@@ -1620,4 +1629,46 @@ DEF E_PUCK Robot {
   controller "my_controller"
   cpuConsumption 1.11
   remoteControl "e-puck_bluetooth"
+}
+CardboardBox {
+  translation -0.213349 0.123374 0.3
+  size 0.2 0.2 0.2
+}
+CardboardBox {
+  translation -0.0827121 -0.1791 0.3
+  name "cardboard box(1)"
+  size 0.2 0.2 0.2
+}
+CardboardBox {
+  translation 0.591966 0.494593 0.3
+  rotation 0 0 1 -0.523595307179586
+  name "cardboard box(2)"
+  size 0.2 0.2 0.2
+}
+CardboardBox {
+  translation 0.870984 0.491692 0.3
+  rotation 0 0 1 -0.523595307179586
+  name "cardboard box(6)"
+  size 0.2 0.2 0.2
+}
+CardboardBox {
+  translation 0.96064 0.202089 0.3
+  rotation 0 0 1 -0.523595307179586
+  name "cardboard box(7)"
+  size 0.2 0.2 0.2
+}
+CardboardBox {
+  translation 0.47122 -0.361116 0.3
+  name "cardboard box(5)"
+  size 0.2 0.2 0.2
+}
+CardboardBox {
+  translation 0.305548 0.450942 0.3
+  name "cardboard box(4)"
+  size 0.2 0.2 0.2
+}
+CardboardBox {
+  translation 0.0396587 0.328544 0.3
+  name "cardboard box(3)"
+  size 0.2 0.2 0.2
 }
