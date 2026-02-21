@@ -10,8 +10,9 @@ WorldInfo {
   basicTimeStep 10
 }
 Viewpoint {
-  orientation 0.5905395287543839 -0.635851371506253 -0.49694677615632804 4.12422083897907
-  position 0.29876087646169197 0.9296287228757358 5.610184878009679
+  fieldOfView 0.75
+  orientation 0.41067075984719886 -0.7692936260140641 -0.48942501364423296 4.625654816884322
+  position -0.29302325773601245 -0.7177407186046847 5.074475269537624
 }
 TexturedBackground {
 }
@@ -33,8 +34,11 @@ RectangleArena {
   }
 }
 DEF E_PUCK Robot {
-  translation -0.660612 0.404509 0.2
+  translation -0.58889 0.352161 0.2
+  rotation 0 0 -1 8.23753e-07
   children [
+    GPS {
+    }
     Lidar {
       translation 0 0 0.05
       name "Lidar1"
@@ -43,7 +47,7 @@ DEF E_PUCK Robot {
       maxRange 2
     }
     DistanceSensor {
-      name "distance_sensor_1"
+      name "DistanceSensor1"
       lookupTable [
         0 0 0
         1 1000 0
@@ -1631,44 +1635,19 @@ DEF E_PUCK Robot {
   remoteControl "e-puck_bluetooth"
 }
 CardboardBox {
-  translation -0.213349 0.123374 0.3
+  translation 0.745532 -0.0637187 0.3
+  rotation 0 0 1 -1.5707953071795862
   size 0.2 0.2 0.2
 }
 CardboardBox {
-  translation -0.0827121 -0.1791 0.3
+  translation 0.281229 0.0752914 0.3
+  rotation 0 0 1 2.61799
   name "cardboard box(1)"
   size 0.2 0.2 0.2
 }
 CardboardBox {
-  translation 0.591966 0.494593 0.3
-  rotation 0 0 1 -0.523595307179586
-  name "cardboard box(2)"
-  size 0.2 0.2 0.2
-}
-CardboardBox {
-  translation 0.870984 0.491692 0.3
-  rotation 0 0 1 -0.523595307179586
-  name "cardboard box(6)"
-  size 0.2 0.2 0.2
-}
-CardboardBox {
-  translation 0.96064 0.202089 0.3
-  rotation 0 0 1 -0.523595307179586
-  name "cardboard box(7)"
-  size 0.2 0.2 0.2
-}
-CardboardBox {
-  translation 0.47122 -0.361116 0.3
+  translation -0.100988 0.183034 0.3
+  rotation 0 0 1 2.61799
   name "cardboard box(5)"
-  size 0.2 0.2 0.2
-}
-CardboardBox {
-  translation 0.305548 0.450942 0.3
-  name "cardboard box(4)"
-  size 0.2 0.2 0.2
-}
-CardboardBox {
-  translation 0.0396587 0.328544 0.3
-  name "cardboard box(3)"
   size 0.2 0.2 0.2
 }
