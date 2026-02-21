@@ -1,6 +1,6 @@
 """my_controller controller."""
 
-from controller import Robot 
+from controller import Robot # type: ignore
 #Error due to library used by webots and not imported locally
 import numpy as np 
 import time
