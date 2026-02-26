@@ -90,7 +90,7 @@ class RobotController:
         # CONSTANTS
         self.DISTANCE_BETWEEN_WHEELS = 0.052 # (m) distance between wheels found in the robot manual
         self.WHEEL_RADIUS = 0.02 # (m) wheel radius found in the robot manual
-        self.MAX_WHEEL_SPEED = 50 # (rad/s) actual max speed is 100, this setting is to not overspeed the robot
+        self.MAX_WHEEL_SPEED = 12.3 # (rad/s) actual max speed is 100, this setting is to not overspeed the robot
         self.MAX_VISION_DISTANCE = 2 # (m) distance where the robot can see
         self.K_DISTANCE = 0.1 # distance gain - TO BE TUNED (probably half of cruise speed)
         self.K_HEADING = 0.1 # heading gain - TO BE TUNED
