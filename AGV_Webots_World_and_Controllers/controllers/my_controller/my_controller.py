@@ -7,7 +7,7 @@ import time
 
 DISTANCE_BETWEEN_WHEELS = 0.052 #(m) distance between wheels found in the robot manual
 WHEEL_RADIUS = 0.02 #(m) wheel radius found in the robot manual
-MAX_WHEEL_SPEED = 50 #(rad/s) actual max speed is 100, this setting is to not overspeed the robot
+MAX_WHEEL_SPEED = 12.3 #(rad/s) actual max speed is 100, this setting is to not overspeed the robot
 
 # Function to set the wheel velocity
 def robot_to_wheel_velocity(lin_vel, ang_vel):

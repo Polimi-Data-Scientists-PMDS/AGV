@@ -14,3 +14,6 @@ PMDS x DevNut Autonomous Guided Vehicle project
 ### Come usare il venv in webots:
 1. Andare in `.venv > bin > python3.14` e fare tasto destro per copiare il percorso assoluto.
 2. Su webots andare in: `Webots > preferences > Python commands` e incollare il nuovo percorso nel box apposito.
+
+### Regole:
+- Non salvare da webots il mondo (cmd + shift + S / ctrl + shift + S) altrimenti i commenti del file .wbt vengono persi, nel caso non pushare il codice
