@@ -2,37 +2,31 @@
 
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/containers/protos/CardboardBox.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Parquetry.proto"
 
+### World Info and Floor ###
 WorldInfo {
   title "curriculum_beginner_linear_camera"
   basicTimeStep 10
 }
 Viewpoint {
   fieldOfView 0.75
-  orientation 0.41067075984719886 -0.7692936260140641 -0.48942501364423296 4.625654816884322
-  position -0.29302325773601245 -0.7177407186046847 5.074475269537624
+  orientation -0.4679594043244729 0.48745071956657327 0.7371606282882411 1.8319190859751369
+  position -1.6515538028794525 -41.29937351086555 87.91412271117235
 }
 TexturedBackground {
 }
 TexturedBackgroundLight {
 }
-RectangleArena {
-  translation 0.197765 0.115667 0.2
-  rotation 0 0 1 -1.5707953071795862
-  floorSize 1.2 1.8
-  floorTileSize 1.2 1.8
-  floorAppearance PBRAppearance {
-    baseColorMap ImageTexture {
-      url [
-        "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/worlds/textures/oval_line.png"
-      ]
-    }
-    roughness 1
-    metalness 0
+Floor {
+  size 69 22
+  appearance Parquetry {
+    type "dark strip"
   }
 }
+
+### E-Puck 1 ###
 DEF E_PUCK Robot {
   translation -0.58889 0.352161 0.2
   rotation 0 0 -1 8.23753e-07
@@ -1634,20 +1628,260 @@ DEF E_PUCK Robot {
   cpuConsumption 1.11
   remoteControl "e-puck_bluetooth"
 }
-CardboardBox {
-  translation 0.745532 -0.0637187 0.3
-  rotation 0 0 1 -1.5707953071795862
-  size 0.2 0.2 0.2
+
+### Walls ###
+# Long Wall 1
+Solid {
+  translation 0 10.9 0.5
+  children [
+    DEF WALL Shape {
+      appearance DEF WALL_LOOK PBRAppearance {
+        roughness 1
+        metalness 0
+      }
+      geometry DEF LONG_WALL_1 Box {
+        size 69 0.2 1
+      }
+    }
+  ]
+  name "Long_Wall_1"
+  boundingObject USE LONG_WALL_1
 }
-CardboardBox {
-  translation 0.281229 0.0752914 0.3
-  rotation 0 0 1 2.61799
-  name "cardboard box(1)"
-  size 0.2 0.2 0.2
+
+# Long Wall 2
+Solid {
+  translation -13.65 -10.9 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF LONG_WALL_2-1 Box {
+        size 41.75 0.2 1
+      }
+    }
+  ]
+  name "Long_Wall_2-1"
+  boundingObject USE LONG_WALL_2-1
 }
-CardboardBox {
-  translation -0.100988 0.183034 0.3
-  rotation 0 0 1 2.61799
-  name "cardboard box(5)"
-  size 0.2 0.2 0.2
+Solid {
+  translation 20.6 -2.8 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF LONG_WALL_2-2 Box {
+        size 27.6 0.2 1
+      }
+    }
+  ]
+  name "Long_Wall_2-2"
+  boundingObject USE LONG_WALL_2-2
+}
+
+# Short Wall 1
+Solid {
+  translation -34.4 0 0.5
+  rotation 0 0 1 1.5707963267948968
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF SHORT_WALL_1 Box {
+        size 21.94 0.2 1
+      }
+    }
+  ]
+  name "Short_Wall_1"
+  boundingObject USE SHORT_WALL_1
+}
+
+# Short Wall 2
+Solid {
+  translation 34.4 4.1 0.5
+  rotation 0 0 1 1.5707963267948968
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF SHORT_WALL_2-1 Box {
+        size 13.8 0.2 1
+      }
+    }
+  ]
+  name "Short_Wall_2-1"
+  boundingObject USE SHORT_WALL_2-1
+}
+Solid {
+  translation 7.3 -2.45 0.5
+  rotation 0 0 1 1.5707963267948968
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF SHORT_WALL_2-2 Box {
+        size 17.1 0.2 1
+      }
+    }
+  ]
+  name "Short_Wall_2-2"
+  boundingObject USE SHORT_WALL_2-2
+}
+
+# Internal Wall
+Solid {
+  translation -5.09814 -7.46193 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF INTERNAL_WALL Box {
+        size 0.5 7 1
+      }
+    }
+  ]
+  name "Internal_Wall"
+  boundingObject USE INTERNAL_WALL
+}
+
+### Work Islands###
+# Work Island 01
+Solid {
+  translation -28.57 0 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF ISLAND_01 Box {
+        size 0.5 14.71 1
+      }
+    }
+  ]
+  name "Work_Island_01"
+  boundingObject USE ISLAND_01
+}
+
+# Work Island 1
+Solid {
+  translation -24.94 1.92 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF ISLAND_1 Box {
+        size 1.2 3 1
+      }
+    }
+  ]
+  name "Work_Island_1"
+  boundingObject USE ISLAND_1
+}
+
+# Work Island 2
+Solid {
+  translation -19.22 4 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF ISLAND_2 Box {
+        size 1 5 1
+      }
+    }
+  ]
+  name "Work_Island_2"
+  boundingObject USE ISLAND_2
+}
+
+# Work Island 3
+Solid {
+  translation -14.18 4 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF ISLAND_3 Box {
+        size 1 5 1
+      }
+    }
+  ]
+  name "Work_Island_3"
+  boundingObject USE ISLAND_3
+}
+
+# Work Island 4
+Solid {
+  translation -9.34 3.43 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF ISLAND_4-1 Box {
+        size 1 2 1
+      }
+    }
+  ]
+  name "Work_Island_4-1"
+  boundingObject USE ISLAND_4-1
+}
+Solid {
+  translation -9.34 0.92 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF ISLAND_4-2 Box {
+        size 3 4 1
+      }
+    }
+  ]
+  name "Work_Island_4-2"
+  boundingObject USE ISLAND_4-2
+}
+
+# Work Island 5
+Solid {
+  translation -2.71 4 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF ISLAND_5 Box {
+        size 1 4 1
+      }
+    }
+  ]
+  name "Work_Island_5"
+  boundingObject USE ISLAND_5
+}
+
+# Work Island 6
+Solid {
+  translation 2.96 4 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF ISLAND_6 Box {
+        size 1 4 1
+      }
+    }
+  ]
+  name "Work_Island_6"
+  boundingObject USE ISLAND_6
+}
+
+# Work Island 7
+Solid {
+  translation 26.36 -0.1 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF ISLAND_7 Box {
+        size 12 3 1
+      }
+    }
+  ]
+  name "Work_Island_7"
+  boundingObject USE ISLAND_7
+}
+
+# Work Island 8
+Solid {
+  translation 12.5 -1.08 0.5
+  children [
+    Shape {
+      appearance USE WALL_LOOK
+      geometry DEF ISLAND_8 Box {
+        size 6 2.5 1
+      }
+    }
+  ]
+  name "Work_Island_8"
+  boundingObject USE ISLAND_7
 }
