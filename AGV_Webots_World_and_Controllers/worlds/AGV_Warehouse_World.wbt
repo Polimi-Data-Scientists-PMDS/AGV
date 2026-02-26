@@ -1170,12 +1170,11 @@ Solid {
 # Short Wall 1
 Solid {
   translation -34.4 0 0.5
-  rotation 0 0 1 1.5707963267948968
   children [
     Shape {
       appearance USE WALL_LOOK
       geometry DEF SHORT_WALL_1 Box {
-        size 21.94 0.2 1
+        size 0.2 21.94 1
       }
     }
   ]
@@ -1186,12 +1185,11 @@ Solid {
 # Short Wall 2
 Solid {
   translation 34.4 4.1 0.5
-  rotation 0 0 1 1.5707963267948968
   children [
     Shape {
       appearance USE WALL_LOOK
       geometry DEF SHORT_WALL_2-1 Box {
-        size 13.8 0.2 1
+        size 0.2 13.8 1
       }
     }
   ]
@@ -1200,12 +1198,11 @@ Solid {
 }
 Solid {
   translation 7.3 -2.45 0.5
-  rotation 0 0 1 1.5707963267948968
   children [
     Shape {
       appearance USE WALL_LOOK
       geometry DEF SHORT_WALL_2-2 Box {
-        size 17.1 0.2 1
+        size 0.2 17.1 1
       }
     }
   ]
