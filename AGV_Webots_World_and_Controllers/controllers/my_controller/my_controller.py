@@ -4,10 +4,91 @@ from controller import Robot # type: ignore
 #Error due to library used by webots and not imported locally
 import numpy as np 
 import time
+import os
+import json
 
 DISTANCE_BETWEEN_WHEELS = 0.052 #(m) distance between wheels found in the robot manual
 WHEEL_RADIUS = 0.02 #(m) wheel radius found in the robot manual
 MAX_WHEEL_SPEED = 12.3 #(rad/s) actual max speed is 100, this setting is to not overspeed the robot
+
+
+class RobotLog:
+    def __init__(self, log_file_path):
+        self.log_file_path = log_file_path
+        self.start_time = None
+        self.last_time = None
+        self.total_time = 0.0
+        self.idle_time = 0.0
+        self.obstacle_count = 0
+        self.events = []
+        #* self.events = [(1.0, "START", "Controller started"), (2.5, "IDLE_START", "linear_speed=0.000"), (4.0, "IDLE_END", "linear_speed=0.500"), (5.0, "OBSTACLE_ENCOUNTER", "L=0.100, C=0.050, R=0.200"), (6.5, "OBSTACLE_CLEARED", "L=0.300, C=0.400, R=0.350"), (10.0, "STOP", "Controller stopped")]
+        self.is_idle = False
+        self.in_obstacle_state = False
+
+    def start(self, sim_time):
+        self.start_time = sim_time
+        self.last_time = sim_time
+        self.log_event(sim_time, "START", "Controller started")
+
+    def log_event(self, sim_time, event_type, details=""):
+        self.events.append((sim_time, event_type, details))
+
+    def update(self, sim_time, linear_speed, idle_speed_threshold=1e-3):
+        if self.start_time is None:
+            self.start(sim_time)
+            return
+
+        if self.last_time is None:
+            self.last_time = sim_time
+
+        delta_t = max(0.0, sim_time - self.last_time)
+        self.total_time = max(0.0, sim_time - self.start_time)
+        
+        currently_idle = abs(linear_speed) <= idle_speed_threshold #! if abs(linear_speed) <= idle_speed_threshold then currently_idle is True, else False
+        if currently_idle:
+            self.idle_time += delta_t
+
+        if currently_idle != self.is_idle:
+            if currently_idle:
+                self.log_event(sim_time, "IDLE_START", f"linear_speed={linear_speed:.6f}")
+            else:
+                self.log_event(sim_time, "IDLE_END", f"linear_speed={linear_speed:.6f}")
+            self.is_idle = currently_idle
+
+        self.last_time = sim_time
+
+    def update_obstacle_state(self, sim_time, has_obstacle, details=""):
+        if has_obstacle and not self.in_obstacle_state:
+            self.obstacle_count += 1
+            self.log_event(sim_time, "OBSTACLE_ENCOUNTER", details)
+        elif not has_obstacle and self.in_obstacle_state:
+            self.log_event(sim_time, "OBSTACLE_CLEARED", details)
+
+        self.in_obstacle_state = has_obstacle
+
+    def save(self):
+        log_dir = os.path.dirname(self.log_file_path)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+
+        run_payload = {
+            "started_at": self.start_time,
+            "ended_at": self.last_time,
+            "total_time": self.total_time,
+            "idle_time": self.idle_time,
+            "obstacle_count": self.obstacle_count,
+            "events": [
+                {
+                    "sim_time": sim_time,
+                    "event_type": event_type,
+                    "details": details,
+                }
+                for sim_time, event_type, details in self.events
+            ],
+        }
+
+        with open(self.log_file_path, "a", encoding="utf-8") as log_file:
+            log_file.write(json.dumps(run_payload) + "\n")
 
 # Function to set the wheel velocity
 def robot_to_wheel_velocity(lin_vel, ang_vel):
@@ -102,6 +183,12 @@ gps = robot.getDevice('gps')
 gps.enable(timestep)
 print(f"GPS Coordinate System: {gps.getCoordinateSystem()}")
 
+
+# Robot log setup
+log_file_path = os.path.join(os.path.dirname(__file__), 'robot_history.jsonl')
+robot_log = RobotLog(log_file_path)
+robot_log.start(robot.getTime())
+
 # Variables for printing the sensor value every 1 second 
 last_print_time = -0.5
 current_time = 0.0
@@ -128,6 +215,15 @@ while robot.step(timestep) != -1:
     gps_values = gps.getValues()
 
     current_time = robot.getTime()
+    current_linear_speed = get_current_linear_speed()
+
+    # Update time + idle stats
+    robot_log.update(current_time, current_linear_speed)
+
+    # Update obstacle encounter stats (count only transition into obstacle state)
+    has_obstacle = (center_min < 0.35) or (left_min < 0.15) or (right_min < 0.15) #! if any of the three sectors has a minimum distance below the threshold, then we consider to be in an obstacle state
+    obstacle_details = f"L={left_min:.3f}, C={center_min:.3f}, R={right_min:.3f}"
+    robot_log.update_obstacle_state(current_time, has_obstacle, obstacle_details)
     #Print sensor values every 0.5 seconds
     if current_time - last_print_time >= 0.5:
         # Print distance sensor value
@@ -145,6 +241,7 @@ while robot.step(timestep) != -1:
 
     if gps_values[0] > 0.45 and gps_values[1] > 0.45 and gps_values[0] < 0.55 and gps_values[1] < 0.55:
         robot_to_wheel_velocity(0, 0)
+        robot_log.log_event(current_time, "TARGET_REACHED", "Robot reached target area")
         print("Target reached!")
         break
     
@@ -190,4 +287,7 @@ while robot.step(timestep) != -1:
             robot_to_wheel_velocity(CRUISE_SPEED, angle)
 
 # Enter here exit cleanup code.
+robot_log.log_event(robot.getTime(), "STOP", "Controller stopped")
+robot_log.save()
+print(f"Robot history saved in: {log_file_path}")
 
