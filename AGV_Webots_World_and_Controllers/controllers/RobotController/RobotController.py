@@ -3,59 +3,81 @@
 from controller import Robot  # type: ignore
 #Error due to library used by webots and not imported locally
 from dataclasses import dataclass
+import os
+import sys
 import numpy as np 
 import time
 import math
 
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "log"))
+if LOG_DIR not in sys.path:
+    sys.path.append(LOG_DIR)
+
+from RobotLog import RobotLog  # type: ignore
+
+
 def main():
     controller = RobotController()
     controller.set_goal_position((5, 5))
+    try:
+        while controller.isAlive():
+            """
+                1. CHECK IF GOAL IS REACHED
+                    IF YES: LOAD NEXT GOAL OR STOP
+            
+                2. UPDATE THE STATE
 
-    while controller.isAlive():
-        """
-            1. CHECK IF GOAL IS REACHED
-                IF YES: LOAD NEXT GOAL OR STOP
-        
-            2. UPDATE THE STATE
+                3. CALCULATE HEADING ERRORS TO THE GOAL
+                    distance error is capped to 2m for better control and obstacle avoidance
 
-            3. CALCULATE HEADING ERRORS TO THE GOAL
-                distance error is capped to 2m for better control and obstacle avoidance
+                4. CHECK IF THERE ARE OBSTACLES ALONG THE LOCAL PATH
+                    (check if the path from the robot to the local goal (2m from it) is free)
+                    IF THERE ARE OBSTACLES: ADJUST THE GOAL (heading error)
 
-            4. CHECK IF THERE ARE OBSTACLES ALONG THE LOCAL PATH
-                (check if the path from the robot to the local goal (2m from it) is free)
-                IF THERE ARE OBSTACLES: ADJUST THE GOAL (heading error)
+                5. SEND FINAL ERRORS (position and heading) TO THE CONTROL
+            """
+            # 1. CHECK IF GOAL IS REACHED
 
-            5. SEND FINAL ERRORS (position and heading) TO THE CONTROL
-        """
-        # 1. CHECK IF GOAL IS REACHED
+            # 2. UPDATE THE STATE
+            controller.state_update()
 
-        # 2. UPDATE THE STATE
-        controller.state_update()
+            # 3. CALCULATE HEADING ERRORS TO THE GOAL
+            distance_error, heading_error = controller.get_control_errors()
 
-        # 3. CALCULATE HEADING ERRORS TO THE GOAL
-        distance_error, heading_error = controller.get_control_errors()
+            # 4. CHECK IF THERE ARE OBSTACLES ALONG THE LOCAL PATH
+            left_min, center_min, right_min = controller.read_lidar()
+            has_obstacle = min(left_min, center_min, right_min) <= 0.2
+            sim_time = controller.robot.getTime()
+            controller.logger.update_obstacle_state(
+                sim_time,
+                has_obstacle,
+                f"L={left_min:.3f}, C={center_min:.3f}, R={right_min:.3f}",
+            )
 
-        # 4. CHECK IF THERE ARE OBSTACLES ALONG THE LOCAL PATH
+            # 5. SEND FINAL ERRORS (position and heading) TO THE CONTROL
+            lin_vel, ang_vel = controller.calculate_velocity(distance_error, heading_error)
+            controller.set_robot_velocity(lin_vel, ang_vel)
+            controller.logger.update(sim_time, lin_vel)
 
-        # 5. SEND FINAL ERRORS (position and heading) TO THE CONTROL
-        lin_vel, ang_vel = controller.calculate_velocity(distance_error, heading_error)
-        controller.set_robot_velocity(lin_vel, ang_vel)
 
-
-        # OUTPUT & PRINTING
-        if controller.should_print():
-            # Print distance sensor value
-            print(f"Time: {controller.robot.getTime()}s")
-            # Print lidar values
-            #print(f"Lidar values: L: {left_min}, C: {center_min}, R: {right_min}")
-            # Print GPS values
-            # print(f"GPS values: {gps_values}")
-            # Get wheel speed and print it
-            w_l, w_r = controller.get_wheel_velocity()
-            lin_vel, ang_vel = controller.get_robot_velocity()
-            print(f"\nWheel speeds:\n L: {w_l}, R: {w_r}")
-            print(f"\nRobot speed:\n linear: {lin_vel}, angular: {ang_vel}")
+            # OUTPUT & PRINTING
+            if controller.should_print():
+                # Print distance sensor value
+                print(f"Time: {controller.robot.getTime()}s")
+                # Print lidar values
+                #print(f"Lidar values: L: {left_min}, C: {center_min}, R: {right_min}")
+                # Print GPS values
+                # print(f"GPS values: {gps_values}")
+                # Get wheel speed and print it
+                w_l, w_r = controller.get_wheel_velocity()
+                lin_vel, ang_vel = controller.get_robot_velocity()
+                print(f"\nWheel speeds:\n L: {w_l}, R: {w_r}")
+                print(f"\nRobot speed:\n linear: {lin_vel}, angular: {ang_vel}")
+    finally:
+        controller.logger.log_event(controller.robot.getTime(), "STOP", "Controller stopped")
+        controller.logger.save()
 
 
 @dataclass
@@ -127,6 +149,9 @@ class RobotController:
 
         # OTHER
         self.last_print_time = 0
+        log_file_path = os.path.join(LOG_DIR, "robot_controller_runs.jsonl")
+        self.logger = RobotLog(log_file_path)
+        self.logger.start(self.robot.getTime())
 
     
     ##### PERCEPTION #####
