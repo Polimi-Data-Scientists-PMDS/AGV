@@ -20,10 +20,12 @@ TexturedBackground {
 TexturedBackgroundLight {
 }
 Floor {
-  size 69 22
-  appearance Parquetry {
-    type "dark strip"
-  }
+    size 69 22
+    appearance DEF DROPOFF_LOOK Appearance {
+        material Material {
+            diffuseColor 0.5 0.5 0.5
+        }
+    }
 }
 
 ### Robots ###
@@ -1117,22 +1119,141 @@ DEF PIONEER_3 Robot {
       -0.06 0 0.06
     ]
   }
-  controller "my_controller"
+  controller "RobotController"
 }
 
-### Dropoff Points ###
+### Dropoff ###
 # Dropoff 01
 Solid {
-  translation -29.9125 5.86372 0.5
+  translation -29.3 4 0
   children [
-    DEF DROPOFF Shape {
-      geometry DEF DROPOFF Box {
-        size 1 1 1e-08
-      }
+    Shape {
+        appearance DEF DROPOFF_LOOK Appearance {
+            material Material {
+                diffuseColor 0.8 0 0
+            }
+        }
+        geometry DEF HIGHLIGHT Box {
+            size 0.5 0.5 1e-3
+        }
     }
   ]
-  name "Dropoff 01"
-  boundingObject USE DROPOFF
+  name "Dropoff_01"
+  boundingObject USE HIGHLIGHT
+}
+
+### Pickups ###
+# Pickup 1
+Solid {
+  translation -24 3.5 0
+  children [
+    Shape {
+        appearance DEF PICKUP_LOOK Appearance {
+            material Material {
+                diffuseColor 0 0.8 0
+            }
+        }
+        geometry USE HIGHLIGHT
+    }
+  ]
+  name "Pickup_1"
+  boundingObject USE HIGHLIGHT
+}
+
+# Pickup 2
+Solid {
+  translation -18.5 6.25 0
+  children [
+    Shape {
+        appearance USE PICKUP_LOOK 
+        geometry USE HIGHLIGHT
+    }
+  ]
+  name "Pickup_2"
+  boundingObject USE HIGHLIGHT
+}
+
+# Pickup 3
+Solid {
+  translation -13.5 6.25 0
+  children [
+    Shape {
+        appearance USE PICKUP_LOOK 
+        geometry USE HIGHLIGHT
+    }
+  ]
+  name "Pickup_3"
+  boundingObject USE HIGHLIGHT
+}
+
+# Pickup 4
+Solid {
+  translation -8.25 4.5 0
+  children [
+    Shape {
+        appearance USE PICKUP_LOOK 
+        geometry USE HIGHLIGHT
+    }
+  ]
+  name "Pickup_4"
+  boundingObject USE HIGHLIGHT
+}
+
+# Pickup 5
+Solid {
+  translation -2 5.75 0
+  children [
+    Shape {
+        appearance USE PICKUP_LOOK 
+        geometry USE HIGHLIGHT
+    }
+  ]
+  name "Pickup_5"
+  boundingObject USE HIGHLIGHT
+}
+
+# Pickup 6
+Solid {
+  translation 3.75 5.75 0
+  children [
+    Shape {
+        appearance USE PICKUP_LOOK 
+        geometry USE HIGHLIGHT
+    }
+  ]
+  name "Pickup_6"
+  boundingObject USE HIGHLIGHT
+}
+
+# Pickup 7
+Solid {
+  translation 18.75 2.25 0
+  children [
+    Shape {
+        appearance USE PICKUP_LOOK 
+        geometry USE HIGHLIGHT
+    }
+  ]
+  name "Pickup_7"
+  boundingObject USE HIGHLIGHT
+}
+
+### Charging stations ###
+# Charging station 1
+Solid {
+  translation 6.75 -4.5 0
+  children [
+    Shape {
+        appearance DEF CHARGING_STATION_LOOK Appearance {
+            material Material {
+                diffuseColor 0 0 0.8
+            }
+        }
+        geometry USE HIGHLIGHT
+    }
+  ]
+  name "Charging_Station_1"
+  boundingObject USE HIGHLIGHT
 }
 
 ### Walls ###
@@ -1140,14 +1261,15 @@ Solid {
 Solid {
   translation 0 10.9 0.5
   children [
-    DEF WALL Shape {
-      appearance DEF WALL_LOOK PBRAppearance {
-        roughness 1
-        metalness 0
-      }
-      geometry DEF LONG_WALL_1 Box {
-        size 69 0.2 1
-      }
+    Shape {
+        appearance DEF WALL_LOOK Appearance {
+            material Material {
+                diffuseColor 1 1 1
+            }
+        }
+        geometry DEF LONG_WALL_1 Box {
+            size 69 0.2 1
+        }
     }
   ]
   name "Long_Wall_1"
@@ -1156,235 +1278,235 @@ Solid {
 
 # Long Wall 2
 Solid {
-  translation -13.65 -10.9 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF LONG_WALL_2-1 Box {
-        size 41.75 0.2 1
-      }
-    }
-  ]
-  name "Long_Wall_2-1"
-  boundingObject USE LONG_WALL_2-1
+    translation -13.65 -10.9 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF LONG_WALL_2-1 Box {
+                size 41.75 0.2 1
+            }
+        }
+    ]
+    name "Long_Wall_2-1"
+    boundingObject USE LONG_WALL_2-1
 }
 Solid {
-  translation 20.6 -2.8 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF LONG_WALL_2-2 Box {
-        size 27.6 0.2 1
-      }
-    }
-  ]
-  name "Long_Wall_2-2"
-  boundingObject USE LONG_WALL_2-2
+    translation 20.6 -2.8 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF LONG_WALL_2-2 Box {
+                size 27.6 0.2 1
+            }
+        }
+    ]
+    name "Long_Wall_2-2"
+    boundingObject USE LONG_WALL_2-2
 }
 
 # Short Wall 1
 Solid {
-  translation -34.4 0 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF SHORT_WALL_1 Box {
-        size 0.2 21.94 1
-      }
-    }
-  ]
-  name "Short_Wall_1"
-  boundingObject USE SHORT_WALL_1
+    translation -34.4 0 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF SHORT_WALL_1 Box {
+                size 0.2 21.94 1
+            }
+        }
+    ]
+    name "Short_Wall_1"
+    boundingObject USE SHORT_WALL_1
 }
 
 # Short Wall 2
 Solid {
-  translation 34.4 4.1 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF SHORT_WALL_2-1 Box {
-        size 0.2 13.8 1
-      }
-    }
-  ]
-  name "Short_Wall_2-1"
-  boundingObject USE SHORT_WALL_2-1
+    translation 34.4 4.1 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF SHORT_WALL_2-1 Box {
+                size 0.2 13.8 1
+            }
+        }
+    ]
+    name "Short_Wall_2-1"
+    boundingObject USE SHORT_WALL_2-1
 }
 Solid {
-  translation 7.3 -2.45 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF SHORT_WALL_2-2 Box {
-        size 0.2 17.1 1
-      }
-    }
-  ]
-  name "Short_Wall_2-2"
-  boundingObject USE SHORT_WALL_2-2
+    translation 7.3 -2.45 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF SHORT_WALL_2-2 Box {
+                size 0.2 17.1 1
+            }
+        }
+    ]
+    name "Short_Wall_2-2"
+    boundingObject USE SHORT_WALL_2-2
 }
 
 # Internal Wall
 Solid {
-  translation -5.09814 -7.46193 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF INTERNAL_WALL Box {
-        size 0.5 7 1
-      }
-    }
-  ]
-  name "Internal_Wall"
-  boundingObject USE INTERNAL_WALL
+    translation -5.09814 -7.46193 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF INTERNAL_WALL Box {
+                size 0.5 7 1
+            }
+        }
+    ]
+    name "Internal_Wall"
+    boundingObject USE INTERNAL_WALL
 }
 
 ### Work Islands###
 # Work Island 01
 Solid {
-  translation -28.57 0 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF ISLAND_01 Box {
-        size 0.5 14.71 1
-      }
-    }
-  ]
-  name "Work_Island_01"
-  boundingObject USE ISLAND_01
+    translation -28.57 0 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF ISLAND_01 Box {
+                size 0.5 14.71 1
+            }
+        }
+    ]
+    name "Work_Island_01"
+    boundingObject USE ISLAND_01
 }
 
 # Work Island 1
 Solid {
-  translation -24.94 1.92 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF ISLAND_1 Box {
-        size 1.2 3 1
-      }
-    }
-  ]
-  name "Work_Island_1"
-  boundingObject USE ISLAND_1
+    translation -24.94 1.92 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF ISLAND_1 Box {
+                size 1.2 3 1
+            }
+        }
+    ]
+    name "Work_Island_1"
+    boundingObject USE ISLAND_1
 }
 
 # Work Island 2
 Solid {
-  translation -19.22 4 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF ISLAND_2 Box {
-        size 1 5 1
-      }
-    }
-  ]
-  name "Work_Island_2"
-  boundingObject USE ISLAND_2
+    translation -19.22 4 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF ISLAND_2 Box {
+                size 1 5 1
+            }
+        }
+    ]
+    name "Work_Island_2"
+    boundingObject USE ISLAND_2
 }
 
 # Work Island 3
 Solid {
-  translation -14.18 4 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF ISLAND_3 Box {
-        size 1 5 1
-      }
-    }
-  ]
-  name "Work_Island_3"
-  boundingObject USE ISLAND_3
+    translation -14.18 4 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF ISLAND_3 Box {
+                size 1 5 1
+            }
+        }
+    ]
+    name "Work_Island_3"
+    boundingObject USE ISLAND_3
 }
 
 # Work Island 4
 Solid {
-  translation -9.34 3.43 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF ISLAND_4-1 Box {
-        size 1 2 1
-      }
-    }
-  ]
-  name "Work_Island_4-1"
-  boundingObject USE ISLAND_4-1
+    translation -9.34 3.43 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF ISLAND_4-1 Box {
+                size 1 2 1
+            }
+        }
+    ]
+    name "Work_Island_4-1"
+    boundingObject USE ISLAND_4-1
 }
 Solid {
-  translation -9.34 0.92 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF ISLAND_4-2 Box {
-        size 3 4 1
-      }
-    }
-  ]
-  name "Work_Island_4-2"
-  boundingObject USE ISLAND_4-2
+    translation -9.34 0.92 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF ISLAND_4-2 Box {
+                size 3 4 1
+            }
+        }
+    ]
+    name "Work_Island_4-2"
+    boundingObject USE ISLAND_4-2
 }
 
 # Work Island 5
 Solid {
-  translation -2.71 4 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF ISLAND_5 Box {
-        size 1 4 1
-      }
-    }
-  ]
-  name "Work_Island_5"
-  boundingObject USE ISLAND_5
+    translation -2.71 4 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF ISLAND_5 Box {
+                size 1 4 1
+            }
+        }
+    ]
+    name "Work_Island_5"
+    boundingObject USE ISLAND_5
 }
 
 # Work Island 6
 Solid {
-  translation 2.96 4 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF ISLAND_6 Box {
-        size 1 4 1
-      }
-    }
-  ]
-  name "Work_Island_6"
-  boundingObject USE ISLAND_6
+    translation 2.96 4 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF ISLAND_6 Box {
+                size 1 4 1
+            }
+        }
+    ]
+    name "Work_Island_6"
+    boundingObject USE ISLAND_6
 }
 
 # Work Island 7
 Solid {
-  translation 26.36 -0.1 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF ISLAND_7 Box {
-        size 12 3 1
-      }
-    }
-  ]
-  name "Work_Island_7"
-  boundingObject USE ISLAND_7
+    translation 26.36 -0.1 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF ISLAND_7 Box {
+                size 12 3 1
+            }
+        }
+    ]
+    name "Work_Island_7"
+    boundingObject USE ISLAND_7
 }
 
 # Work Island 8
 Solid {
-  translation 12.5 -1.08 0.5
-  children [
-    Shape {
-      appearance USE WALL_LOOK
-      geometry DEF ISLAND_8 Box {
-        size 6 2.5 1
-      }
-    }
-  ]
-  name "Work_Island_8"
-  boundingObject USE ISLAND_7
+    translation 12.5 -1.08 0.5
+    children [
+        Shape {
+            appearance USE WALL_LOOK
+            geometry DEF ISLAND_8 Box {
+                size 6 2.5 1
+            }
+        }
+    ]
+    name "Work_Island_8"
+    boundingObject USE ISLAND_7
 }
