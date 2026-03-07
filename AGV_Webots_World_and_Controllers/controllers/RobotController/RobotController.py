@@ -52,22 +52,24 @@ def main():
             # 4. CHECK IF THERE ARE OBSTACLES ALONG THE LOCAL PATH
             left_min, center_min, right_min = controller.read_lidar()
             has_obstacle = min(left_min, center_min, right_min) <= 0.2
+            # TODO: check if the path from the robot to the local goal (2m from it) is free
+            
+
+            # 5. SEND FINAL ERRORS (position and heading) TO THE CONTROL
+            lin_vel, ang_vel = controller.calculate_velocity(distance_error, heading_error)
+            controller.set_robot_velocity(lin_vel, ang_vel)
+
+            # LOGGING
             sim_time = controller.robot.getTime()
             controller.logger.update_obstacle_state(
                 sim_time,
                 has_obstacle,
                 f"L={left_min:.3f}, C={center_min:.3f}, R={right_min:.3f}",
             )
-
-            # 5. SEND FINAL ERRORS (position and heading) TO THE CONTROL
-            lin_vel, ang_vel = controller.calculate_velocity(distance_error, heading_error)
-            controller.set_robot_velocity(lin_vel, ang_vel)
             controller.logger.update(sim_time, lin_vel)
-
 
             # OUTPUT & PRINTING
             if controller.should_print():
-                # Print distance sensor value
                 print("---------------------")
                 if controller.has_reached_goal():
                     print("GOAL REACHED!")
@@ -79,8 +81,8 @@ def main():
                 # Get wheel speed and print it
                 w_l, w_r = controller.get_wheel_velocity()
                 lin_vel, ang_vel = controller.get_robot_velocity()
-                print(f"\nWheel speeds:\n L: {w_l}, R: {w_r}")
-                print(f"\nRobot speed:\n linear: {lin_vel}, angular: {ang_vel}")
+                print(f"\nWheel speeds:\n L: {w_l} rad/s, R: {w_r} rad/s")
+                print(f"\nRobot speed:\n linear: {lin_vel} m/s, angular: {ang_vel} rad/s")
                 if controller.goal_position is not None:
                     print(f"Goal position: \n x: {controller.goal_position.x} \n y: {controller.goal_position.y}")
                 else:
@@ -326,23 +328,6 @@ class RobotController:
 
     def has_reached_goal(self) -> bool:
         return self.state.calculate_errors(self.goal_position)[0] < self.GOAL_REACHED_THRESH
-
-
-    # def get_acceleration_speed(self, target_speed, current_speed, delta_time, time_to_target):
-    #     if current_speed <= target_speed:
-    #         delta_vel = (target_speed - current_speed) / delta_time
-    #     elif current_speed > target_speed:
-    #         delta_vel = (target_speed - current_speed) / delta_time
-    #     return current_speed + delta_vel*time_to_target
-
-    # def get_angle_to_target(self):
-    #     # Get GPS values
-    #     gps_values = self.gps.getValues()
-    #     # Calculate the angle to the target point
-    #     angle = np.arctan2(self.goal_position[1] - gps_values[1], self.goal_position[0] - gps_values[0])
-    #     return angle
     
-
-
 if __name__ == "__main__":
     main()
