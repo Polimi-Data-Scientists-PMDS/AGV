@@ -1120,6 +1120,21 @@ DEF PIONEER_3 Robot {
   controller "my_controller"
 }
 
+### Dropoff Points ###
+# Dropoff 01
+Solid {
+  translation -29.9125 5.86372 0.5
+  children [
+    DEF DROPOFF Shape {
+      geometry DEF DROPOFF Box {
+        size 1 1 1e-08
+      }
+    }
+  ]
+  name "Dropoff 01"
+  boundingObject USE DROPOFF
+}
+
 ### Walls ###
 # Long Wall 1
 Solid {
