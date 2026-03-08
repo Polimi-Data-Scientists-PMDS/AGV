@@ -38,7 +38,7 @@ DEF PIONEER_3 Robot {
     GPS {
     }
     Lidar {
-      translation 0 0 0.05
+      translation 0 0 0.5
       name "Lidar1"
       horizontalResolution 360
       fieldOfView 3.15
@@ -1125,7 +1125,7 @@ DEF PIONEER_3 Robot {
 ### Dropoff ###
 # Dropoff 01
 Solid {
-  translation -29.3 4 0
+  translation -29.3 4 5e-4
   children [
     Shape {
         appearance DEF DROPOFF_LOOK Appearance {
@@ -1145,12 +1145,12 @@ Solid {
 ### Pickups ###
 # Pickup 1
 Solid {
-  translation -24 3.5 0
+  translation -24 3.5 5e-4
   children [
     Shape {
         appearance DEF PICKUP_LOOK Appearance {
             material Material {
-                diffuseColor 0 0.8 0
+                diffuseColor 0 0 0.8
             }
         }
         geometry USE HIGHLIGHT
@@ -1162,7 +1162,7 @@ Solid {
 
 # Pickup 2
 Solid {
-  translation -18.5 6.25 0
+  translation -18.5 6.25 5e-4
   children [
     Shape {
         appearance USE PICKUP_LOOK 
@@ -1188,7 +1188,7 @@ Solid {
 
 # Pickup 4
 Solid {
-  translation -8.25 4.5 0
+  translation -8.25 4.5 5e-4
   children [
     Shape {
         appearance USE PICKUP_LOOK 
@@ -1201,7 +1201,7 @@ Solid {
 
 # Pickup 5
 Solid {
-  translation -2 5.75 0
+  translation -2 5.75 5e-4
   children [
     Shape {
         appearance USE PICKUP_LOOK 
@@ -1214,7 +1214,7 @@ Solid {
 
 # Pickup 6
 Solid {
-  translation 3.75 5.75 0
+  translation 3.75 5.75 5e-4
   children [
     Shape {
         appearance USE PICKUP_LOOK 
@@ -1227,7 +1227,7 @@ Solid {
 
 # Pickup 7
 Solid {
-  translation 18.75 2.25 0
+  translation 18.75 2.25 5e-4
   children [
     Shape {
         appearance USE PICKUP_LOOK 
@@ -1241,12 +1241,12 @@ Solid {
 ### Charging stations ###
 # Charging station 1
 Solid {
-  translation 6.75 -4.5 0
+  translation 6.75 -4.5 5e-4
   children [
     Shape {
         appearance DEF CHARGING_STATION_LOOK Appearance {
             material Material {
-                diffuseColor 0 0 0.8
+                diffuseColor 0 0.8 0
             }
         }
         geometry USE HIGHLIGHT
