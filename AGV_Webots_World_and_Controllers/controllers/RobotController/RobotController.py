@@ -53,13 +53,14 @@ def main():
             # 3. CALCULATE HEADING ERRORS TO THE GOAL
             distance_error, heading_error = controller.get_control_errors()
 
-            # 4. CHECK IF THERE ARE OBSTACLES ALONG THE LOCAL PATH
-            pointcloud = controller.read_lidar(heading_error)
+            # 4. OBSTACLE AVOIDANCE
+            pointcloud = controller.read_lidar()
             has_obstacle = any((dist < 0.5 and abs(angle) < 0.5) for angle, dist in pointcloud)
+            distance_error, heading_error = controller.obstacle_avoidance(pointcloud, distance_error, heading_error)
+
             # 5. SEND FINAL ERRORS (position and heading) TO THE CONTROL
             lin_vel, ang_vel = controller.calculate_velocity(distance_error, heading_error)
-            
-            lin_vel, ang_vel = controller.obstacle_avoidance(pointcloud, lin_vel, ang_vel)
+            #lin_vel, ang_vel = controller.obstacle_avoidance(pointcloud, lin_vel, ang_vel)
             
             controller.set_robot_velocity(lin_vel, ang_vel)
 
@@ -74,29 +75,61 @@ def main():
 
             # OUTPUT & PRINTING
             if controller.should_print():
-                print("---------------------")
-                if controller.has_reached_goal():
-                    print("GOAL REACHED!")
+                # print("---------------------")
+                # if controller.has_reached_goal():
+                #     print("GOAL REACHED!")
             
-                print(f"\nTime: {controller.robot.getTime()}s")
+                # print(f"\nTime: {controller.robot.getTime()}s")
                 
-                w_l, w_r = controller.get_wheel_velocity()
-                lin_vel, ang_vel = controller.get_robot_velocity()
-                print(f"\nWheel speeds:\n L: {w_l} rad/s, R: {w_r} rad/s")
-                print(f"\nRobot speed:\n linear: {lin_vel} m/s, angular: {ang_vel} rad/s")
+                # w_l, w_r = controller.get_wheel_velocity()
+                # lin_vel, ang_vel = controller.get_robot_velocity()
+                # print(f"\nWheel speeds:\n L: {w_l:.1f} rad/s, R: {w_r:.1f} rad/s")
+                # print(f"\nRobot speed:\n linear: {lin_vel:.1f} m/s, angular: {ang_vel:.1f} rad/s")
                 
-                if controller.goal_position is not None:
-                    print(f"Goal position: \n x: {controller.goal_position.x} \n y: {controller.goal_position.y}")
-                else:
-                    print("Goal position: None")
+                # if controller.goal_position is not None:
+                #     print(f"Goal position: \n x: {controller.goal_position.x} \n y: {controller.goal_position.y}")
+                # else:
+                #     print("Goal position: None")
                 
-                print(f"Current Robot state: \n x: {controller.state.x:.3f} \n y: {controller.state.y:.3f} \n th: {controller.state.theta:.3f}")
-                print(f"Errors: \n rho: {distance_error:.3f} \n alpha: {heading_error:.3f}")
+                # print(f"Current Robot state: \n x: {controller.state.x:.3f} \n y: {controller.state.y:.3f} \n th: {controller.state.theta:.3f}")
+                # print(f"Errors: \n rho: {distance_error:.3f} \n alpha: {heading_error:.3f}")
+                print("="*40)
+                # Status
+                status = "GOAL REACHED!" if controller.has_reached_goal() else "MOVING..."
+                print(f"Status: {status}")
+                print(f"Time: {controller.robot.getTime():.2f}s")
 
-                # Print lidar values
-                #print(f"Lidar values: L: {left_min}, C: {center_min}, R: {right_min}")
-                # Print GPS values
-                # print(f"GPS values: {gps_values}")
+                # Goal
+                if controller.goal_position is not None:
+                    print(f"\nGoal:")
+                    print(f"  x: {controller.goal_position.x:.1f} m")
+                    print(f"  y: {controller.goal_position.y:.1f} m")
+                else:
+                    print("\nCurrent goal: None")
+
+                # Current state
+                print(f"\nState:")
+                print(f"  x: {controller.state.x:.2f} m")
+                print(f"  y: {controller.state.y:.2f} m")
+                print(f"  th: {controller.state.theta:.2f} rad")
+
+                # Errors
+                print(f"\n\nControl errors:")
+                print(f"  Distance: {distance_error:.1f} m")
+                print(f"  Heading: {heading_error:.2f} rad")
+
+                # Wheel velocities
+                # v_l, v_r = controller.get_wheel_velocity()
+                # print(f"\n\nWheel velocities (m/s):")
+                # print(f"  Left : {v_l:.2f}")
+                # print(f"  Right: {v_r:.2f}")
+
+                # Robot linear & angular velocity
+                lin_vel, ang_vel = controller.get_robot_velocity()
+                print(f"\nRobot velocities:")
+                print(f"  Linear : {lin_vel:.2f} m/s")
+                print(f"  Angular: {ang_vel:.2f} rad/s")
+                print("="*40)
     
     finally:
         controller.logger.log_event(controller.robot.getTime(), "STOP", "Controller stopped")
@@ -149,7 +182,10 @@ class RobotController:
         self.DISTANCE_BETWEEN_WHEELS = 0.33 # (m) distance between wheels found in the robot manual
         self.WHEEL_RADIUS = 0.0975 # (m) wheel radius found in the robot manual
         self.MAX_WHEEL_SPEED = 12.3 # (rad/s) actual max speed is 100, this setting is to not overspeed the robot
-        self.MAX_VISION_DISTANCE = 2 # (m) distance where the robot can see
+        self.CONTROL_VISION_DISTANCE = 2 # (m) distance where the robot can see
+        #self.LIDAR_VISION_DISTANCE = 2 # (m) distance that the lidar sees
+        self.SAFE_DISTANCE = 1 # (m) distance from where to avoid obstacles
+        self.LIDAR_FOV = 180
         self.K_DISTANCE = 0.5 # distance gain 
         self.K_HEADING = 0.6 # heading gain - TO BE TUNED
         self.MAX_LIN_VEL = 0.4 # (m/s) - TO BE TUNED
@@ -168,6 +204,7 @@ class RobotController:
         self.state = State(0, 0, 0)
         self.goal_position = None
         self.gps_initial_state = None
+        self.avoidance_side = 0 # 0: None, 1: Left, -1: Right - helps obstacle avoidance to stick with one side
 
 
         # DEVICES
@@ -187,15 +224,20 @@ class RobotController:
         # Lidar
         self.lidar = self.robot.getDevice('Lidar1')
         self.lidar.enable(self.initial_timestep)
+        self.robot.step(self.initial_timestep)
         print("Lidar set up correctly!")
-        print(f"Lidar FOV: {self.lidar.getFov()} radians ({self.lidar.getFov()*180/np.pi} degrees), horizontal resolution: {self.lidar.getHorizontalResolution()} points, max range: {self.lidar.getMaxRange()}m")
+        print("RangeImage size:", len(self.lidar.getRangeImage()))
+        print("Horizontal resolution:", self.lidar.getHorizontalResolution())
+        print(f"Lidar FOV: {self.lidar.getFov()} radians ({self.lidar.getFov()*180/np.pi} degrees), max range: {self.lidar.getMaxRange()}m")
         # print(f"Lidar output size: {len(self.lidar.getRangeImage())}")
         
         # Gps
         self.gps = self.robot.getDevice('gps')
         self.gps.enable(self.initial_timestep)
+        self.robot.step(self.initial_timestep)
         self.gps_initial_state = self.gps.getValues()
         print("GPS set up correctly!")
+        print(f"GPS initial coordinates: x: {self.gps_initial_state[0]}, y: {self.gps_initial_state[1]}")
         print(f"GPS coordinate system: {self.gps.getCoordinateSystem()}")
 
         # OTHER
@@ -203,6 +245,7 @@ class RobotController:
         log_file_path = os.path.join(LOG_DIR, "robot_controller_runs.jsonl")
         self.logger = RobotLog(log_file_path)
         self.logger.start(self.robot.getTime())
+
 
     
     ##### PERCEPTION #####
@@ -248,22 +291,42 @@ class RobotController:
         # fuse with gps data
         self.state.fuse_with_gps(x, y)
 
+
         # dX = x - self.state.x
         # dY = y - self.state.y
         # print(f"GPS coordinates: x: {dX}, y: {dY}")
         # differences.append((dX, dY))
     
-    def read_lidar(self, heading_error):
-        """Return LIDAR scan as a list of (angle, distance) tuples."""
-        raw_range_image = self.lidar.getRangeImage()
-        fov = self.lidar.getFov()  
-        N = len(raw_range_image)
+    # def read_lidar(self, heading_error):
+    #     """Return LIDAR scan as a list of (angle, distance) tuples."""
+    #     raw_range_image = self.lidar.getRangeImage()
+    #     fov = self.lidar.getFov()  
+    #     N = len(raw_range_image)
         
-        points = []
-        for i, r in enumerate(raw_range_image):
-            angle = -fov/2 + i * fov/(N-1) - heading_error
-            points.append((angle, r))
+    #     points = []
+    #     for i, r in enumerate(raw_range_image):
+    #         angle = -fov/2 + i * fov/(N-1) #- heading_error
+    #         points.append((angle, r))
             
+    #     return points
+    def read_lidar(self):
+        """Return LIDAR scan as a list of (angle, distance) tuples."""
+
+        ranges = self.lidar.getRangeImage()
+        N = len(ranges)
+
+        fov = self.lidar.getFov()
+        resolution = self.lidar.getHorizontalResolution()
+
+        # Webots guarantees this mapping
+        angle_step = fov / resolution
+
+        points = []
+
+        for i, r in enumerate(ranges):
+            angle = -fov/2 + i * angle_step
+            points.append((angle, r))
+
         return points
     
     def min_distances(self, pointcloud):
@@ -292,7 +355,7 @@ class RobotController:
                 r4 = dist
         return l4, l3, l2, l1, r1, r2, r3, r4
     
-    def obstacle_avoidance(self, pointcloud, lin_vel, ang_vel):
+    def old_obstacle_avoidance(self, pointcloud, lin_vel, ang_vel):
         l4, l3, l2, l1, r1, r2, r3, r4 = self.min_distances(pointcloud)
 
         # Compact summaries
@@ -327,6 +390,78 @@ class RobotController:
 
         return lin_vel, ang_vel
 
+    def obstacle_avoidance(self, pointcloud, dist_e, heading_e):
+        # --- 1. SETUP ---
+        NUM_SECTORS = 32
+        INFLATION = 2 # How many extra sectors to block around an obstacle
+        fov = self.lidar.getFov()
+        sector_width = fov / NUM_SECTORS
+        sectors = [self.lidar.getMaxRange()] * NUM_SECTORS
+        obstacle_found = False
+
+        # --- 2. MAP LIDAR ---
+        for angle, dist in pointcloud:
+            if dist < self.SAFE_DISTANCE:
+                sector_id = int((angle + fov/2) / sector_width)
+                if 0 <= sector_id < NUM_SECTORS:
+                    # Block the sector and its neighbors (Robot Width)
+                    for j in range(sector_id - INFLATION, sector_id + INFLATION + 1):
+                        if 0 <= j < NUM_SECTORS:
+                            sectors[j] = min(sectors[j], dist)
+                    obstacle_found = True
+
+        # Generate Radar View
+        visual_map = "".join(["|" if s < self.SAFE_DISTANCE else "." for s in sectors])
+
+        if not obstacle_found:
+            self.avoidance_side = 0 
+            return dist_e, heading_e
+
+        # --- 3. CHOOSE SIDE (With High Persistence) ---
+        best_sector_angle = None
+        min_error = float('inf')
+
+        for i in range(NUM_SECTORS):
+            if sectors[i] >= self.SAFE_DISTANCE:
+                sector_angle = (i + 0.5) * sector_width - fov/2
+                error = abs(np.arctan2(np.sin(sector_angle - heading_e), 
+                                    np.cos(sector_angle - heading_e)))
+
+                # INCREASED BIAS: 0.6 radians (~35 degrees)
+                # This makes the robot VERY stubborn about switching sides.
+                bias = 0.0
+                if self.avoidance_side == 1 and sector_angle > 0:
+                    bias = 0.6 
+                elif self.avoidance_side == -1 and sector_angle < 0:
+                    bias = 0.6
+                
+                effective_error = error - bias
+
+                if effective_error < min_error:
+                    min_error = effective_error
+                    best_sector_angle = sector_angle
+
+        # --- 4. EXECUTION ---
+        if best_sector_angle is not None:
+            self.avoidance_side = 1 if best_sector_angle > 0 else -1
+            
+            # Calculate speed reduction based on turn sharpness
+            # We use sector_angle relative to robot front (0)
+            deviation = abs(best_sector_angle) 
+            # If we turn more than 60 degrees, slow down significantly
+            speed_factor = max(0.1, np.cos(deviation))
+            
+            side_str = "LEFT" if self.avoidance_side == 1 else "RIGHT"
+            print(f"RADAR: [{visual_map}] LOCKED {side_str} | Steering: {best_sector_angle:.2f}")
+            
+            return dist_e * speed_factor, best_sector_angle
+
+        else:
+            print(f"RADAR: [{visual_map}] NO PATH - STOP")
+            self.avoidance_side = 0
+            return 0.0, 0.0
+    
+
     ##### CONTROL #####
     def set_goal_position(self, position: tuple):
         if position is None:
@@ -337,7 +472,7 @@ class RobotController:
 
     def get_control_errors(self) -> tuple:
         rho, alpha = self.state.calculate_errors(self.goal_position)
-        rho = min(self.MAX_VISION_DISTANCE, rho) # cap to max vision distance
+        rho = min(self.CONTROL_VISION_DISTANCE, rho) # cap to max vision distance
         return rho, alpha
     
     def calculate_velocity(self, rho, alpha):
@@ -382,12 +517,12 @@ class RobotController:
     def get_wheel_velocity(self):
         w_r = self.motorR.getVelocity()
         w_l = self.motorL.getVelocity()
-        return w_l, w_r
-
-    def get_robot_velocity(self):
-        w_l, w_r = self.get_wheel_velocity()
         v_r = w_r * self.WHEEL_RADIUS
         v_l = w_l * self.WHEEL_RADIUS
+        return v_l, v_r
+
+    def get_robot_velocity(self):
+        v_l, v_r = self.get_wheel_velocity()
         lin_vel = (v_r + v_l) / 2
         ang_vel = (v_r - v_l) / self.DISTANCE_BETWEEN_WHEELS
         return lin_vel, ang_vel
