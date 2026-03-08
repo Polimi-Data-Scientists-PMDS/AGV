@@ -19,8 +19,11 @@ from RobotLog import RobotLog  # type: ignore
 
 
 def main():
+    goal_positions = ((-29.3, 4), (-8.25, 4.5)) # dropoff 01 and pickup 4
+    goal_index = 0
     controller = RobotController()
-    controller.set_goal_position((4, -4))
+    controller.set_goal_position(goal_positions[goal_index])
+    
     try:
         while controller.is_alive():
             """
@@ -40,7 +43,8 @@ def main():
             """
             # 1. CHECK IF GOAL IS REACHED
             if controller.goal_position is not None and controller.has_reached_goal():
-                controller.set_goal_position(None)
+                goal_index = (goal_index + 1)%2
+                controller.set_goal_position(goal_positions[goal_index])
                 print("GOAL REACHED!")
 
             # 2. UPDATE THE STATE
@@ -50,22 +54,22 @@ def main():
             distance_error, heading_error = controller.get_control_errors()
 
             # 4. CHECK IF THERE ARE OBSTACLES ALONG THE LOCAL PATH
-            left_min, center_min, right_min = controller.read_lidar()
-            has_obstacle = min(left_min, center_min, right_min) <= 0.2
-            # TODO: check if the path from the robot to the local goal (2m from it) is free
-            
-
+            pointcloud = controller.read_lidar(heading_error)
+            has_obstacle = any((dist < 0.5 and abs(angle) < 0.5) for angle, dist in pointcloud)
             # 5. SEND FINAL ERRORS (position and heading) TO THE CONTROL
             lin_vel, ang_vel = controller.calculate_velocity(distance_error, heading_error)
+            
+            lin_vel, ang_vel = controller.obstacle_avoidance(pointcloud, lin_vel, ang_vel)
+            
             controller.set_robot_velocity(lin_vel, ang_vel)
 
             # LOGGING
             sim_time = controller.robot.getTime()
-            controller.logger.update_obstacle_state(
-                sim_time,
-                has_obstacle,
-                f"L={left_min:.3f}, C={center_min:.3f}, R={right_min:.3f}",
-            )
+            # controller.logger.update_obstacle_state(
+            #     sim_time,
+            #     has_obstacle,
+            #     f"L={left_min:.3f}, C={center_min:.3f}, R={right_min:.3f}",
+            # )
             controller.logger.update(sim_time, lin_vel)
 
             # OUTPUT & PRINTING
@@ -73,23 +77,26 @@ def main():
                 print("---------------------")
                 if controller.has_reached_goal():
                     print("GOAL REACHED!")
+            
                 print(f"\nTime: {controller.robot.getTime()}s")
-                # Print lidar values
-                #print(f"Lidar values: L: {left_min}, C: {center_min}, R: {right_min}")
-                # Print GPS values
-                # print(f"GPS values: {gps_values}")
-                # Get wheel speed and print it
+                
                 w_l, w_r = controller.get_wheel_velocity()
                 lin_vel, ang_vel = controller.get_robot_velocity()
                 print(f"\nWheel speeds:\n L: {w_l} rad/s, R: {w_r} rad/s")
                 print(f"\nRobot speed:\n linear: {lin_vel} m/s, angular: {ang_vel} rad/s")
+                
                 if controller.goal_position is not None:
                     print(f"Goal position: \n x: {controller.goal_position.x} \n y: {controller.goal_position.y}")
                 else:
                     print("Goal position: None")
+                
                 print(f"Current Robot state: \n x: {controller.state.x:.3f} \n y: {controller.state.y:.3f} \n th: {controller.state.theta:.3f}")
                 print(f"Errors: \n rho: {distance_error:.3f} \n alpha: {heading_error:.3f}")
 
+                # Print lidar values
+                #print(f"Lidar values: L: {left_min}, C: {center_min}, R: {right_min}")
+                # Print GPS values
+                # print(f"GPS values: {gps_values}")
     
     finally:
         controller.logger.log_event(controller.robot.getTime(), "STOP", "Controller stopped")
@@ -182,6 +189,8 @@ class RobotController:
         self.lidar.enable(self.initial_timestep)
         print("Lidar set up correctly!")
         print(f"Lidar FOV: {self.lidar.getFov()} radians ({self.lidar.getFov()*180/np.pi} degrees), horizontal resolution: {self.lidar.getHorizontalResolution()} points, max range: {self.lidar.getMaxRange()}m")
+        # print(f"Lidar output size: {len(self.lidar.getRangeImage())}")
+        
         # Gps
         self.gps = self.robot.getDevice('gps')
         self.gps.enable(self.initial_timestep)
@@ -198,8 +207,10 @@ class RobotController:
     
     ##### PERCEPTION #####
     def update_wheel_odometry(self):
-        """
-
+        """Compute robot displacement from wheel encoder changes.
+            Returns:
+                dS (float): Linear displacement of the robot (m).
+                dTheta (float): Change in robot orientation (rad).
         """
         posL = self.posL.getValue()
         posR = self.posR.getValue()
@@ -223,6 +234,7 @@ class RobotController:
 
 
     def state_update(self):
+        """Update the robot's state using wheel odometry and GPS fusion."""
         # get position and orientation from gps and update the state
         # get delta movement
         dS, dTheta = self.update_wheel_odometry()
@@ -240,22 +252,80 @@ class RobotController:
         # dY = y - self.state.y
         # print(f"GPS coordinates: x: {dX}, y: {dY}")
         # differences.append((dX, dY))
-
-  
-        
-    def read_lidar(self):
-        raw_range_image = self.lidar.getRangeImage() # List of SP floats what describe the range
-        clean_range_image = [x if x != float('inf') else self.lidar.getMaxRange() for x in raw_range_image] # Remove inf values
-        # Split the list in three sectors (right, center, left) and get minimum of each secor
-        sector_size = self.lidar.getHorizontalResolution() // 3
-        left_sector = np.array(clean_range_image[0 : sector_size])
-        center_sector = np.array(clean_range_image[sector_size : 2*sector_size])
-        right_sector = np.array(clean_range_image[2*sector_size : 3*sector_size])
-        left_min = np.min(left_sector)
-        center_min = np.min(center_sector)
-        right_min = np.min(right_sector)
-        return left_min, center_min, right_min
     
+    def read_lidar(self, heading_error):
+        """Return LIDAR scan as a list of (angle, distance) tuples."""
+        raw_range_image = self.lidar.getRangeImage()
+        fov = self.lidar.getFov()  
+        N = len(raw_range_image)
+        
+        points = []
+        for i, r in enumerate(raw_range_image):
+            angle = -fov/2 + i * fov/(N-1) - heading_error
+            points.append((angle, r))
+            
+        return points
+    
+    def min_distances(self, pointcloud):
+        # Angles step in each direction: 
+        # 7,5 > 15 > 30 > 37,5 => 0,1308 > 0,2618 > 0,5236 > 0,6545
+        # 7,5 > 22,5 > 52,5 > 90 => 0,1308 > 0,3927 > 0,9163 > 1,5708
+
+        l4, l3, l2, l1, r1, r2, r3, r4 =  (self.lidar.getMaxRange() for _ in range(8))
+
+        for angle, dist in pointcloud:
+            if angle < -0.9163 and l4 > dist:
+                l4 = dist
+            elif angle < -0.3927 and l3 > dist:
+                l3 = dist
+            elif angle < -0.1308 and l2 > dist:
+                l2 = dist
+            elif angle < 0 and l1 > dist:
+                l1 = dist
+            elif angle < 0.1308 and r1 > dist:
+                r1 = dist
+            elif angle < 0.3927 and r2 > dist:
+                r2 = dist
+            elif angle < 0.9163 and r3 > dist:
+                r3 = dist
+            elif r4 > dist:
+                r4 = dist
+        return l4, l3, l2, l1, r1, r2, r3, r4
+    
+    def obstacle_avoidance(self, pointcloud, lin_vel, ang_vel):
+        l4, l3, l2, l1, r1, r2, r3, r4 = self.min_distances(pointcloud)
+
+        # Compact summaries
+        center_min = min(l1, r1, l2, r2)
+        left_min   = min(l3, l4)
+        right_min  = min(r3, r4)
+
+        # In a dead end > reverse
+        if center_min < 0.15 and right_min < 0.05 and left_min < 0.05:
+            print("DEAD END! REVERSING!")
+            return 0, 10*np.sign(ang_vel) 
+        # Close object in front > turn
+        elif center_min < 0.3:
+            print ("OBSTACLE IN FRONT! TURNING!")
+            if right_min > left_min:
+                return lin_vel*0.5, -2.0 #turn left
+            else:
+                return lin_vel*0.5, 2.0 #turn rightight
+        # # Object in front > slow down 
+        # elif center_min < 0.5:
+        #     return lin_vel*0.7, ang_vel
+        # # Object on the right 
+        # elif right_min < 0.05 and right_min < left_min:
+        #     if ang_vel > 0:
+        #         return lin_vel*0.7, ang_vel-3.0
+        #     return lin_vel*0.7, ang_vel #small turn left
+        # # Object on the left
+        # elif left_min < 0.05 and left_min < right_min:
+        #     if ang_vel < 0:
+        #         return lin_vel*0.7, ang_vel+3.0
+        #     return lin_vel*0.7, ang_vel #small turn right
+
+        return lin_vel, ang_vel
 
     ##### CONTROL #####
     def set_goal_position(self, position: tuple):
@@ -271,6 +341,14 @@ class RobotController:
         return rho, alpha
     
     def calculate_velocity(self, rho, alpha):
+        """Compute linear and angular velocities from distance and heading errors.
+            Args:
+                rho (float): Distance error to the goal (m).
+                alpha (float): Heading error to the goal (rad).
+            Returns:
+                lin_vel (float): Linear velocity (m/s), capped and non-negative.
+                ang_vel (float): Angular velocity (rad/s), limited and dead-zoned.
+        """
         lin_vel = self.K_DISTANCE * rho * np.cos(alpha)  # cos(alpha) is to slow down forward motion in case alpha is big
         ang_vel = self.K_HEADING * alpha
         # linear velocity limits
