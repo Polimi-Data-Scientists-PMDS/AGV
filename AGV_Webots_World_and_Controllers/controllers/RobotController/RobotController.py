@@ -75,6 +75,22 @@ def main():
 
             # OUTPUT & PRINTING
             if controller.should_print():
+                v_l, v_r = controller.get_wheel_velocity()
+                l4, l3, l2, l1, r1, r2, r3, r4 = controller.min_distances(pointcloud)
+                
+                sensor_data = {
+                    "time": sim_time,
+                    "state": {"x": controller.state.x, "y": controller.state.y, "theta": controller.state.theta},
+                    "gps": {"x": controller.last_gps_x, "y": controller.last_gps_y},
+                    "gps_diff": {"dx": controller.last_gps_dx, "dy": controller.last_gps_dy},
+                    "errors": {"distance": distance_error, "heading": heading_error},
+                    "wheel_velocities": {"left": v_l, "right": v_r},
+                    "robot_velocities": {"linear": lin_vel, "angular": ang_vel},
+                    "lidar_min_distances": [l4, l3, l2, l1, r1, r2, r3, r4],
+                    "pointcloud": pointcloud
+                }
+                controller.logger.log_realtime(sensor_data)
+
                 # print("---------------------")
                 # if controller.has_reached_goal():
                 #     print("GOAL REACHED!")
@@ -205,6 +221,11 @@ class RobotController:
         self.goal_position = None
         self.gps_initial_state = None
         self.avoidance_side = 0 # 0: None, 1: Left, -1: Right - helps obstacle avoidance to stick with one side
+        
+        self.last_gps_x = 0.0
+        self.last_gps_y = 0.0
+        self.last_gps_dx = 0.0
+        self.last_gps_dy = 0.0
 
 
         # DEVICES
@@ -288,6 +309,12 @@ class RobotController:
         x, y, _ = self.gps.getValues()
         x -= self.gps_initial_state[0]
         y -= self.gps_initial_state[1]
+        
+        self.last_gps_x = x
+        self.last_gps_y = y
+        self.last_gps_dx = x - self.state.x
+        self.last_gps_dy = y - self.state.y
+
         # fuse with gps data
         self.state.fuse_with_gps(x, y)
 
