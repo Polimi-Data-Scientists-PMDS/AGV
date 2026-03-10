@@ -4,6 +4,15 @@ import json
 class RobotLog:
     def __init__(self, log_file_path):
         self.log_file_path = log_file_path
+        self.realtime_log_file_path = log_file_path.replace(".jsonl", "_realtime.jsonl") if log_file_path.endswith(".jsonl") else log_file_path + "_realtime.jsonl"
+        
+        # clear the realtime log file on start
+        log_dir = os.path.dirname(self.realtime_log_file_path)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+        with open(self.realtime_log_file_path, "w", encoding="utf-8") as f:
+            pass
+
         self.start_time = None
         self.last_time = None
         self.total_time = 0.0
@@ -54,6 +63,10 @@ class RobotLog:
             self.log_event(sim_time, "OBSTACLE_CLEARED", details)
 
         self.in_obstacle_state = has_obstacle
+
+    def log_realtime(self, sensor_data):
+        with open(self.realtime_log_file_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(sensor_data) + "\n")
 
     def save(self):
         log_dir = os.path.dirname(self.log_file_path)
