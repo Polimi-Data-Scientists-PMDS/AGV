@@ -1,5 +1,7 @@
 import os
 import json
+import uuid
+import mysql.connector
 
 class RobotLog:
     def __init__(self, log_file_path):
@@ -19,6 +21,7 @@ class RobotLog:
         self.idle_time = 0.0
         self.obstacle_count = 0
         self.events = []
+        self.angular_velocity = []
         #* self.events = [(1.0, "START", "Controller started"), (2.5, "IDLE_START", "linear_speed=0.000"), (4.0, "IDLE_END", "linear_speed=0.500"), (5.0, "OBSTACLE_ENCOUNTER", "L=0.100, C=0.050, R=0.200"), (6.5, "OBSTACLE_CLEARED", "L=0.300, C=0.400, R=0.350"), (10.0, "STOP", "Controller stopped")]
         self.is_idle = False
         self.in_obstacle_state = False
@@ -31,7 +34,7 @@ class RobotLog:
     def log_event(self, sim_time, event_type, details=""):
         self.events.append((sim_time, event_type, details))
 
-    def update(self, sim_time, linear_speed, idle_speed_threshold=1e-3):
+    def update(self, sim_time, linear_speed, angular_speed, idle_speed_threshold=1e-3):
         if self.start_time is None:
             self.start(sim_time)
             return
@@ -54,6 +57,8 @@ class RobotLog:
             self.is_idle = currently_idle
 
         self.last_time = sim_time
+        self.angular_velocity.append(angular_speed)
+
 
     def update_obstacle_state(self, sim_time, has_obstacle, details=""):
         if has_obstacle and not self.in_obstacle_state:
@@ -91,3 +96,92 @@ class RobotLog:
 
         with open(self.log_file_path, "a", encoding="utf-8") as log_file:
             log_file.write(json.dumps(run_payload) + "\n")
+
+    def save_to_database(self):
+        """
+        Reads the realtime sensor_data JSONL file and inserts it into MySQL 
+        in a single robust batch operation.
+        """
+        if not os.path.exists(self.realtime_log_file_path):
+            print(f"Realtime log file not found: {self.realtime_log_file_path}")
+            return
+
+        simulation_id = str(uuid.uuid4())
+        data_tuples = []
+
+
+        with open(self.realtime_log_file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    data_tuples.append((
+                        simulation_id,
+                        data.get("time", 0.0),
+                        data.get("state", {}).get("x"),
+                        data.get("state", {}).get("y"),
+                        data.get("state", {}).get("theta"),
+                        data.get("gps", {}).get("x"),
+                        data.get("gps", {}).get("y"),
+                        data.get("gps_diff", {}).get("dx"),
+                        data.get("gps_diff", {}).get("dy"),
+                        data.get("errors", {}).get("distance"),
+                        data.get("errors", {}).get("heading"),
+                        data.get("wheel_velocities", {}).get("left"),
+                        data.get("wheel_velocities", {}).get("right"),
+                        data.get("robot_velocities", {}).get("linear"),
+                        data.get("robot_velocities", {}).get("angular")
+                    ))
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+        if not data_tuples:
+            print("No realtime log data to save to database.")
+            return
+
+        # Replace credentials/db with env variables or standard defaults as necessary
+        db_host = os.getenv("DB_HOST", "127.0.0.1")
+        db_port = int(os.getenv("DB_PORT", 3306))
+        db_user = os.getenv("DB_USER", "root")
+        db_password = os.getenv("DB_PASSWORD", "agv_pass") # Updated to match your docker container
+        db_name = os.getenv("DB_NAME", "robot_db")
+
+        conn = None
+        cursor = None
+        try:
+            conn = mysql.connector.connect(
+                host=db_host,
+                port=db_port,
+                user=db_user,
+                password=db_password,
+                database=db_name
+            )
+            cursor = conn.cursor()
+
+            insert_query = """
+                INSERT INTO robot_telemetry (
+                    simulation_id, sim_time, state_x, state_y, state_theta,
+                    gps_x, gps_y, gps_dx, gps_dy, 
+                    error_distance, error_heading, 
+                    wheel_vel_left, wheel_vel_right, 
+                    robot_vel_linear, robot_vel_angular
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+
+            # Batch insert using executemany for high performance
+            cursor.executemany(insert_query, data_tuples)
+            conn.commit()
+            print(f"Successfully saved {len(data_tuples)} telemetry records to the database.")
+
+        except Exception as e:
+            print(f"Failed to save telemetry to database: {e}")
+
+        finally:
+            if cursor is not None:
+                try: cursor.close()
+                except Exception: pass
+            if conn is not None and conn.is_connected():
+                try: conn.close()
+                except Exception: pass

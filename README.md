@@ -8,7 +8,7 @@ PMDS x DevNut Autonomous Guided Vehicle project
 - Attivare il venv (unico dei tre comandi da fare sempre)
 ```source .venv/bin/activate```
 
-- Installare i requirements
+- Installare i requirements (*requirements.txt è stato aggiornato il 14/03/2026, se ci sono problemi con le dipendenze, controllare che sia aggiornato*)
 ```pip install -r requirements.txt```
 
 ### Come usare il venv in webots:
@@ -17,3 +17,112 @@ PMDS x DevNut Autonomous Guided Vehicle project
 
 ### Regole:
 - Non salvare da webots il mondo (cmd + shift + S / ctrl + shift + S) altrimenti i commenti del file .wbt vengono persi, nel caso non pushare il codice
+
+---
+# Installazione db su docker
+
+Questa guida ti mostrerà come installare Docker, avviare un container MySQL e creare la struttura del database per salvare i log del tuo simulatore robotico.
+
+### Passo 1: Installare Docker Desktop
+
+1. Vai sul sito ufficiale [docker.com](https://www.docker.com/products/docker-desktop) e scarica **Docker Desktop** per il tuo sistema operativo (Mac, Windows o Linux).
+2. Installa l'applicazione seguendo la procedura standard del tuo sistema.
+3. Apri Docker Desktop e **attendi che si avvii completamente**.
+
+### Passo 2: Avviare il Container MySQL
+
+Apri il tuo terminale (o Prompt dei comandi) ed esegui questo comando per scaricare e avviare MySQL in background:
+
+```bash
+docker run --name agv-logger -e MYSQL_ROOT_PASSWORD=agv_pass -p 3306:3306 -d mysql:latest
+
+```
+- **`--name agv-logger`**: Assegna un nome al container per facilitarne la gestione.
+- **`-e MYSQL_ROOT_PASSWORD=agv_pass`**: Imposta la password per l'utente root di MySQL (puoi cambiarla se vuoi, ma ricordati!).
+- **`-d`**: Avvia il container in modalità "detached" (in background).
+- **`-p 3306:3306`**: Espone la porta standard di MySQL per permettere al tuo script Python di comunicare con il database (la porta di sinistra può essere cambiata, per comodità utilizziamo la stessa).
+- **`mysql:latest`**: Specifica l'immagine di MySQL da utilizzare: [mysql](https://hub.docker.com/_/mysql).
+
+### Passo 3: Accedere alla Console di MySQL
+
+Ora dobbiamo "entrare" nel container per creare il database. Esegui:
+
+```bash
+docker exec -it agv-logger mysql -u root -p
+
+```
+
+*Ti verrà richiesta la password in quanto stiamo entrando come utente root. Digita `agv_pass` e premi Invio (non vedrai i caratteri mentre digiti).*
+
+### Passo 4: Creare il Database e la Tabella
+
+Una volta dentro la console di MySQL (il prompt mostrerà `mysql>`), copia e incolla i seguenti comandi uno alla volta:
+
+**1. Crea e seleziona il database:**
+
+```sql
+CREATE DATABASE agv_data;
+USE agv_data;
+
+```
+
+**2. Crea la tabella per la telemetria:**
+
+```sql
+CREATE TABLE robot_telemetry (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    simulation_id VARCHAR(50) NOT NULL,
+    sim_time DOUBLE NOT NULL,
+    state_x DOUBLE,
+    state_y DOUBLE,
+    state_theta DOUBLE,
+    gps_x DOUBLE,
+    gps_y DOUBLE,
+    gps_dx DOUBLE,
+    gps_dy DOUBLE,
+    error_distance DOUBLE,
+    error_heading DOUBLE,
+    wheel_vel_left DOUBLE,
+    wheel_vel_right DOUBLE,
+    robot_vel_linear DOUBLE,
+    robot_vel_angular DOUBLE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+```
+
+Se tutto è andato a buon fine, vedrai il messaggio `Query OK`. Puoi uscire digitando `EXIT;`.
+
+> ricordarsi di installare il nuovo pacchetto di python chiamato `mysql-connector-python`.
+---
+
+### Gestione del Container: Uscire, Fermare e Riavviare
+
+#### 1. Uscire dalla console MySQL (`exit`)
+
+Se ti trovi all'interno della riga di comando di MySQL (dove vedi il prompt `mysql>`), devi prima tornare al terminale normale del tuo sistema. Digita semplicemente:
+
+```sql
+exit;
+
+```
+
+*(Vedrai il messaggio "Bye" e il terminale tornerà al prompt standard del tuo Mac).*
+
+#### 2. Fermare il container (`docker stop`)
+
+Anche se sei uscito da MySQL, il database sta ancora girando in background. Per "spegnerlo" e liberare le risorse del computer, usa il comando `stop` seguito dal nome che hai dato al tuo container:
+
+```bash
+docker stop agv-logger
+
+```
+
+#### 3. Far ripartire il container (`docker start`)
+
+Quando sei pronto a riprendere la tua simulazione su Webots, **non devi eseguire di nuovo il comando `docker run**` (ti darebbe errore dicendo che il nome esiste già). Ti basta "riaccendere" il container esistente:
+
+```bash
+docker start agv-logger
+
+```
