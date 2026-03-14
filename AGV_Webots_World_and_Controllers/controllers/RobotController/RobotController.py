@@ -71,14 +71,16 @@ def main():
             #     has_obstacle,
             #     f"L={left_min:.3f}, C={center_min:.3f}, R={right_min:.3f}",
             # )
-            controller.logger.update(sim_time, lin_vel)
+            controller.logger.update(sim_time, lin_vel, ang_vel)
 
             # OUTPUT & PRINTING
             if controller.should_print():
                 v_l, v_r = controller.get_wheel_velocity()
                 #l4, l3, l2, l1, r1, r2, r3, r4 = controller.min_distances(pointcloud)
-                
+
+                # Log real-time data
                 sensor_data = {
+                    #* Inserire un id  per ogni simulazione (simulazione 1, simulazione 2, ecc) per poter distinguere i log di più simulazioni
                     "time": sim_time,
                     "state": {"x": controller.state.x, "y": controller.state.y, "theta": controller.state.theta},
                     "gps": {"x": controller.last_gps_x, "y": controller.last_gps_y},
@@ -87,28 +89,11 @@ def main():
                     "wheel_velocities": {"left": v_l, "right": v_r},
                     "robot_velocities": {"linear": lin_vel, "angular": ang_vel},
                     #"lidar_min_distances": [l4, l3, l2, l1, r1, r2, r3, r4],
-                    "pointcloud": pointcloud
+                    # "pointcloud": pointcloud #* Non inserirlo
                 }
                 controller.logger.log_realtime(sensor_data)
 
-                # print("---------------------")
-                # if controller.has_reached_goal():
-                #     print("GOAL REACHED!")
-            
-                # print(f"\nTime: {controller.robot.getTime()}s")
-                
-                # w_l, w_r = controller.get_wheel_velocity()
-                # lin_vel, ang_vel = controller.get_robot_velocity()
-                # print(f"\nWheel speeds:\n L: {w_l:.1f} rad/s, R: {w_r:.1f} rad/s")
-                # print(f"\nRobot speed:\n linear: {lin_vel:.1f} m/s, angular: {ang_vel:.1f} rad/s")
-                
-                # if controller.goal_position is not None:
-                #     print(f"Goal position: \n x: {controller.goal_position.x} \n y: {controller.goal_position.y}")
-                # else:
-                #     print("Goal position: None")
-                
-                # print(f"Current Robot state: \n x: {controller.state.x:.3f} \n y: {controller.state.y:.3f} \n th: {controller.state.theta:.3f}")
-                # print(f"Errors: \n rho: {distance_error:.3f} \n alpha: {heading_error:.3f}")
+                # Prints
                 print("="*40)
                 # Status
                 status = "GOAL REACHED!" if controller.has_reached_goal() else "MOVING..."
@@ -149,7 +134,10 @@ def main():
     
     finally:
         controller.logger.log_event(controller.robot.getTime(), "STOP", "Controller stopped")
-        controller.logger.save()
+        try:
+            controller.logger.save()
+        finally:
+            controller.logger.save_to_database()
 
 
 @dataclass
