@@ -1,6 +1,10 @@
 # AGV
 PMDS x DevNut Autonomous Guided Vehicle project
 
+## TODOS
+Check [TODO.md](./TODO.md) for the list of tasks to be done.
+
+## Installazione ambiente di sviluppo
 ### Come installare le dependencies:
 - Installare il virtual enviorment 
 ```  python3.14 -m venv .venv ```
@@ -18,8 +22,8 @@ PMDS x DevNut Autonomous Guided Vehicle project
 ### Regole:
 - Non salvare da webots il mondo (cmd + shift + S / ctrl + shift + S) altrimenti i commenti del file .wbt vengono persi, nel caso non pushare il codice
 
----
-# Installazione db su docker
+
+## Installazione database su docker
 
 Questa guida ti mostrerà come installare Docker, avviare un container MySQL e creare la struttura del database per salvare i log del tuo simulatore robotico.
 
@@ -35,7 +39,6 @@ Apri il tuo terminale (o Prompt dei comandi) ed esegui questo comando per scaric
 
 ```bash
 docker run --name agv-logger -e MYSQL_ROOT_PASSWORD=agv_pass -p 3306:3306 -d mysql:latest
-
 ```
 - **`--name agv-logger`**: Assegna un nome al container per facilitarne la gestione.
 - **`-e MYSQL_ROOT_PASSWORD=agv_pass`**: Imposta la password per l'utente root di MySQL (puoi cambiarla se vuoi, ma ricordati!).
@@ -49,7 +52,6 @@ Ora dobbiamo "entrare" nel container per creare il database. Esegui:
 
 ```bash
 docker exec -it agv-logger mysql -u root -p
-
 ```
 
 *Ti verrà richiesta la password in quanto stiamo entrando come utente root. Digita `agv_pass` e premi Invio (non vedrai i caratteri mentre digiti).*
@@ -63,33 +65,11 @@ Una volta dentro la console di MySQL (il prompt mostrerà `mysql>`), copia e inc
 ```sql
 CREATE DATABASE agv_data;
 USE agv_data;
-
 ```
 
-**2. Crea la tabella per la telemetria:**
+**2. Crea le tabelle per il log:**
 
-```sql
-CREATE TABLE robot_telemetry (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    simulation_id VARCHAR(50) NOT NULL,
-    sim_time DOUBLE NOT NULL,
-    state_x DOUBLE,
-    state_y DOUBLE,
-    state_theta DOUBLE,
-    gps_x DOUBLE,
-    gps_y DOUBLE,
-    gps_dx DOUBLE,
-    gps_dy DOUBLE,
-    error_distance DOUBLE,
-    error_heading DOUBLE,
-    wheel_vel_left DOUBLE,
-    wheel_vel_right DOUBLE,
-    robot_vel_linear DOUBLE,
-    robot_vel_angular DOUBLE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-```
+Copiare ed incollare le diferse query per creare le tabelle che si trovano all'interno di [Database_Structure.sql](Database_Structure.sql) (assicurati di eseguire ogni query separatamente, non tutto in una volta).
 
 Se tutto è andato a buon fine, vedrai il messaggio `Query OK`. Puoi uscire digitando `EXIT;`.
 
@@ -104,7 +84,6 @@ Se ti trovi all'interno della riga di comando di MySQL (dove vedi il prompt `mys
 
 ```sql
 exit;
-
 ```
 
 *(Vedrai il messaggio "Bye" e il terminale tornerà al prompt standard del tuo Mac).*
@@ -115,14 +94,14 @@ Anche se sei uscito da MySQL, il database sta ancora girando in background. Per 
 
 ```bash
 docker stop agv-logger
-
 ```
 
 #### 3. Far ripartire il container (`docker start`)
 
-Quando sei pronto a riprendere la tua simulazione su Webots, **non devi eseguire di nuovo il comando `docker run**` (ti darebbe errore dicendo che il nome esiste già). Ti basta "riaccendere" il container esistente:
+Quando sei pronto a riprendere la tua simulazione su Webots, **non devi eseguire di nuovo il comando `docker run`** (ti darebbe errore dicendo che il nome esiste già). Ti basta "riaccendere" il container esistente:
 
 ```bash
 docker start agv-logger
-
 ```
+
+Una volta avviato bisognerà aspettare rientrare nella console di MySQL (con `docker exec -it agv-logger mysql -u root -p`) e inserendo la password. Dunque selezionare il database (`USE agv_data;`) prima di poter eseguire query o inserire dati.
