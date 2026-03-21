@@ -1119,7 +1119,7 @@ DEF PIONEER_3 Robot {
       -0.06 0 0.06
     ]
   }
-  controller "RobotController"
+  controller "DefaultController"
 }
 
 ### Dropoff ###
