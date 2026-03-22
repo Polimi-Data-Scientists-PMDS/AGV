@@ -311,7 +311,7 @@ class RobotController_v1:
 
         # --- 2. MAP LIDAR ---
         for angle, dist in pointcloud:
-            if dist < self.SAFE_DISTANCE:
+            if dist < self.SAFE_DISTANCE and (dist_e >= self.SAFE_DISTANCE or dist < dist_e):
                 sector_id = int((angle + fov/2) / sector_width)
                 if 0 <= sector_id < NUM_SECTORS:
                     unnamed_sectors[sector_id] = 'o'
