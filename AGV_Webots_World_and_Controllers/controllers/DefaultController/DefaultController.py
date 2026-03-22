@@ -111,8 +111,8 @@ try:
             reached_point = goal_positions[goal_index]
             controller.logger.log_target_reached(
                 controller.robot.getTime(),
-                point_index=goal_index,
-                point=reached_point,
+                target_index=goal_index,
+                target=reached_point,
             )
             goal_index = (goal_index + 1)%2
             controller.set_goal_position(goal_positions[goal_index])
