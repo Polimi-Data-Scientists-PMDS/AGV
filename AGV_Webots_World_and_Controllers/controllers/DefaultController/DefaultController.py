@@ -31,6 +31,16 @@ controller.set_goal_position(goal_positions[goal_index])
 
 try:
     while controller.is_alive():
+
+        if controller.should_save_to_db():
+            print("5s passed, saving log...")
+            try:
+                controller.logger.save()
+                print("Log saved successfully!")
+            finally:
+                controller.logger.save_to_database()
+                print("Log saved to database successfully!")
+
         # OUTPUT & PRINTING
         if controller.should_print():
             v_l, v_r = controller.get_wheel_velocity()
@@ -144,6 +154,7 @@ try:
         # )
         controller.logger.update(sim_time, lin_vel, ang_vel)
 
+# TODO: remmove duplicate saving
 finally:
     print("Controller stopped, saving log...")
     controller.logger.log_event(controller.robot.getTime(), "STOP", "Controller stopped")

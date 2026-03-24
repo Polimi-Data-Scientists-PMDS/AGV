@@ -121,18 +121,22 @@ class RobotLog:
             os.makedirs(log_dir, exist_ok=True)
 
         run_payload = {
+            "sim_id": self.sim_id,
+            "controller_version": self.controller_version,
             "started_at": self.start_time,
             "ended_at": self.last_time,
             "total_time": self.total_time,
             "idle_time": self.idle_time,
             "obstacle_count": self.obstacle_count,
+            "event_count": self.event_count,
             "events": [
                 {
+                    "sim_id": sim_id,
                     "sim_time": sim_time,
                     "event_type": event_type,
                     "details": details,
                 }
-                for sim_time, event_type, details in self.events
+                for sim_id, sim_time, event_type, details in self.events
             ],
         }
 
@@ -187,21 +191,26 @@ class RobotLog:
             cursor.executemany(insert_query_events, self.events)
             conn.commit()
             print(f"Successfully saved {len(self.events)} event records to the database.")
+            self.events = []
+            print("Cleared events after saving to database.")
 
-            cursor.execute(insert_query_simulations, (
-                self.sim_id,
-                self.controller_version,
-                self.total_time,
-                self.obstacle_count,
-                self.idle_time,
-                self.event_count
-            ))
-            conn.commit()
-            print("Successfully saved simulation summary to the database.")
+            # TODO: FIX: CAN ONLYU SAVE ONCE PER SIMULATION BECAUSE OF PRIMARY KEY CONSTRAINT
+            # cursor.execute(insert_query_simulations, (
+            #     self.sim_id,
+            #     self.controller_version,
+            #     self.total_time,
+            #     self.obstacle_count,
+            #     self.idle_time,
+            #     self.event_count
+            # ))
+            # conn.commit()
+            # print("Successfully saved simulation summary to the database.")
 
             cursor.executemany(insert_query_events_telemetry, self.event_telemetry)
             conn.commit()
             print(f"Successfully saved {len(self.event_telemetry)} event telemetry records to the database.")
+            self.event_telemetry = []  
+            print("Cleared event telemetry after saving to database.")
 
         except Exception as e:
             print(f"Failed to save events to database: {e}")
@@ -213,3 +222,4 @@ class RobotLog:
             if conn is not None and conn.is_connected():
                 try: conn.close()
                 except Exception: pass
+            
