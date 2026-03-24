@@ -129,7 +129,8 @@ class RobotController_v1:
         print(f"GPS coordinate system: {self.gps.getCoordinateSystem()}")
 
         # OTHER
-        self.last_print_time = 0
+        self.last_print_time = 0.0
+        self.last_db_save = 0.0
         log_file_path = os.path.join(LOG_DIR, "robot_controller_runs.jsonl")
         self.logger = RobotLog(log_file_path, controller_version="v1")
         self.logger.start(self.robot.getTime())
@@ -588,6 +589,14 @@ class RobotController_v1:
         if should_print:
             self.last_print_time = current_time
         return should_print
+    
+    def should_save_to_db(self) -> bool:
+        # save to db every 5 seconds
+        current_time = self.robot.getTime()
+        output = current_time - self.last_db_save >= 5.0
+        if output:
+            self.last_db_save = current_time
+        return output
 
     def has_reached_goal(self) -> bool:
         return self.state.calculate_errors(self.goal_position)[0] < self.GOAL_REACHED_THRESH
