@@ -4,7 +4,7 @@ In here we will keep track of the things we need to do. Will include done and no
 ## Short Term
 - [RobotLog.py](./AGV_Webots_World_and_Controllers/controllers/log/RobotLog.py)
     * Fix database connection and make sure we can read and write to it.
-    * Remove the `save()` function once the database connection is working.
+    * Remove the `save()` function once the database connection is working and aftert making sure that the data it saves **actually makes sense**.
     * Within the log's constructor (`__init__`), remove `self.log_file_path` and just leave two JSONL files  `self.realtime_log_file_path` and `self.realtime_panel`.
     * Fix time format for `sim_time` in order to have it sql compatible (HH:MM:SS).
 - [RobotController_v1.py](./AGV_Webots_World_and_Controllers/controllers/DefaultController/RobotController/RobotController_v1.py)
