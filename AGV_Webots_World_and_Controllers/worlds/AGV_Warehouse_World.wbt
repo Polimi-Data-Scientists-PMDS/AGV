@@ -33,6 +33,7 @@ Floor {
 
 # Pioneer_3 1
 DEF PIONEER_3 Robot {
+  supervisor TRUE
   translation 0 0 0.0975
   children [
     GPS {
@@ -1120,6 +1121,19 @@ DEF PIONEER_3 Robot {
     ]
   }
   controller "DefaultController"
+}
+
+### Moving parts ###
+# Moving wall
+DEF MOVING_WALL Solid {
+  translation -7 0.5 1
+  children [
+    Shape {
+      geometry Box { size 1 1 2 }
+    }
+  ]
+  boundingObject Box { size 1 1 2 }
+  physics NULL
 }
 
 ### Dropoff ###

@@ -1,4 +1,4 @@
-from controller import Robot  # type: ignore
+from controller import Supervisor  # type: ignore
 #Error due to library used by webots and not imported locally
 from dataclasses import dataclass
 import os
@@ -76,7 +76,7 @@ class RobotController_v1:
         # self.HARD_TURN_SPEED = 0.2 # (m/s)
 
         # ROBOT
-        self.robot = Robot() # Robot instance
+        self.robot = Supervisor() # Robot instance
         self.initial_timestep = int(self.robot.getBasicTimeStep()) # (ms) currently timestep is 1ms
         
         #self.state = None
