@@ -3,9 +3,6 @@ from controller import Robot  # type: ignore
 from dataclasses import dataclass
 import os
 import sys
-import numpy as np 
-import time
-import math
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -19,18 +16,37 @@ for path in (LOG_DIR, ROBOT_CONTROLLER_v1_DIR):
         sys.path.append(path)
 
 from RobotControllers.RobotController_v1 import RobotController_v1 
+from MovingWalls import MovingWalls
 # Currently useless:
 # from RobotLog import RobotLog 
 
 # MAIN
 
-goal_positions = ((-29.3, 4), (-8.25, 4.5)) # dropoff 01 and pickup 4
+goal_positions = [
+    (-29.3, 4),    # Dropoff point 01
+    (-13.5, 6.25), # Pickup point 3
+    (-8.25, 4.5),  # Pickup point 4
+    (6.75, -4.5),  # Charging station
+    (-24, 3.5),    # Pickup point 1
+    (-29.3, 4),    # Dropoff point 01
+    (-18.5, 6.25), # Pickup point 2
+    (-2, 5.75),    # Pickup point 5
+    (3.75, 5.75),  # Pickup point 6
+    (-29.3, 4),    # Dropoff point 01
+    (18.75, 2.25), # Pickup point 7
+    (6.75, -4.5),  # Charging station
+]
 goal_index = 0
 controller = RobotController_v1()
 controller.set_goal_position(goal_positions[goal_index])
 
+# setup moving wall
+moving_wall = MovingWalls(controller.robot.getBasicTimeStep(), controller.robot)
+
 try:
     while controller.is_alive():
+
+        moving_wall.move_wall(controller.robot.getTime())
 
         if controller.should_save_to_db():
             print("5s passed, saving log...")
@@ -124,7 +140,7 @@ try:
                 target_index=goal_index,
                 target=reached_point,
             )
-            goal_index = (goal_index + 1)%2
+            goal_index = (goal_index + 1)%len(goal_positions)
             controller.set_goal_position(goal_positions[goal_index])
             print("GOAL REACHED!")
 
