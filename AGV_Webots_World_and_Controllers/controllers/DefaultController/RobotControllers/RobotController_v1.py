@@ -64,8 +64,8 @@ class RobotController_v1:
         self.CONTROL_VISION_DISTANCE = 2 # (m) distance where the robot can see
         #self.LIDAR_VISION_DISTANCE = 2 # (m) distance that the lidar sees
         self.SAFE_DISTANCE = 2 # (m) distance from where to avoid obstacles
-        self.COLLISION_DISTANCE = 0.1 # (m) distance where it finds a collision
-        self.LIDAR_FOV = 360 # 180
+        self.COLLISION_DISTANCE = 0.2 # (m) distance where it finds a collision
+        self.LIDAR_FOV = 180 # 180
         self.K_DISTANCE = 0.5 # distance gain 
         self.K_HEADING = 0.6 # heading gain - TO BE TUNED
         self.MAX_LIN_VEL = 0.4 # (m/s) - TO BE TUNED
@@ -306,12 +306,12 @@ class RobotController_v1:
         # --- 0. COLLISION DETECTION ---
         if min(x[1] for x in pointcloud) < self.COLLISION_DISTANCE:
             print(f"COLLISION DETECTED")
-            self.logger.log_unexpected_behaviour(self.robot.get_time(), "Collision detected, stopping.")
+            self.logger.log_unexpected_behavior(self.robot.getTime(), "Collision detected, stopping.")
             self.avoidance_side = 0
             return 0.0, 0.0
 
         # --- 1. SETUP ---
-        NUM_SECTORS = 64
+        NUM_SECTORS = 32
         PADDING = 4
         fov = self.lidar.getFov()
         sector_width = fov / NUM_SECTORS
@@ -321,7 +321,7 @@ class RobotController_v1:
         # --- 2. MAP LIDAR ---
         for angle, dist in pointcloud:
             if dist < self.SAFE_DISTANCE and (dist_e >= self.SAFE_DISTANCE or dist < dist_e):
-                sector_id = int((angle + fov/2) / sector_width)
+                sector_id = int((angle + fov/2) / sector_width) % NUM_SECTORS
                 if 0 <= sector_id < NUM_SECTORS:
                     unnamed_sectors[sector_id] = 'o'
                     obstacle_found = True
@@ -470,7 +470,7 @@ class RobotController_v1:
         # update the lock
         if best_sector_index is None: # filled with obstacles -> no way to go
             print(f"RADAR: [FILLED] NO PATH - STOP")
-            self.logger.log_unexpected_behaviour(self.robot.get_time(), "No path found, stopping.")
+            self.logger.log_unexpected_behavior(self.robot.getTime(), "No path found, stopping.")
             self.avoidance_side = 0
             return 0.0, 0.0
         

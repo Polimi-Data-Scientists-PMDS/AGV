@@ -42,7 +42,7 @@ DEF PIONEER_3 Robot {
       translation 0 0 0.5
       name "Lidar1"
       horizontalResolution 360
-      fieldOfView 6.28
+      fieldOfView 3.14
       maxRange 2
     }
     DEF BODY Pose {
