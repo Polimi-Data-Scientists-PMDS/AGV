@@ -41,12 +41,14 @@ controller = RobotController_v1()
 controller.set_goal_position(goal_positions[goal_index])
 
 # setup moving wall
-moving_wall = MovingWalls(controller.robot.getBasicTimeStep(), controller.robot)
+moving_wall_1 = MovingWalls(controller.robot.getBasicTimeStep(), controller.robot, "_1")
+moving_wall_2 = MovingWalls(controller.robot.getBasicTimeStep(), controller.robot, "_2")    
 
 try:
     while controller.is_alive():
 
-        moving_wall.move_wall(controller.robot.getTime())
+        moving_wall_1.move_wall(controller.robot.getTime(), 3, 0.1, 'y')
+        moving_wall_2.move_wall(controller.robot.getTime(), 5, 0.1, 'x')
 
         if controller.should_save_to_db():
             print("5s passed, saving log...")
@@ -152,8 +154,8 @@ try:
 
         # 4. OBSTACLE AVOIDANCE
         pointcloud = controller.read_lidar()
-        has_obstacle = any((dist < 0.5 and abs(angle) < 0.5) for angle, dist in pointcloud)
         distance_error, heading_error = controller.obstacle_avoidance(pointcloud, distance_error, heading_error)
+        has_obstacle = len(controller.used_obstacle_ids) > 0
 
         # 5. SEND FINAL ERRORS (position and heading) TO THE CONTROL
         lin_vel, ang_vel = controller.calculate_velocity(distance_error, heading_error)
@@ -163,11 +165,12 @@ try:
 
         # LOGGING
         sim_time = controller.robot.getTime()
-        # controller.logger.update_obstacle_state(
-        #     sim_time,
-        #     has_obstacle,
-        #     f"L={left_min:.3f}, C={center_min:.3f}, R={right_min:.3f}",
-        # )
+
+        controller.logger.update_obstacle_state(
+            sim_time,
+            has_obstacle,
+            f"obstacle(s) found at coordinates x = {controller.last_gps_x}; y = {controller.last_gps_y}" if has_obstacle else f"obstacle cleared at coordinates x = {controller.last_gps_x}; y = {controller.last_gps_y}",
+        )
         controller.logger.update(sim_time, lin_vel, ang_vel)
 
 # TODO: remmove duplicate saving
