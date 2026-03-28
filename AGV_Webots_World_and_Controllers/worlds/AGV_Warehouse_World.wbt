@@ -42,7 +42,7 @@ DEF PIONEER_3 Robot {
       translation 0 0 0.5
       name "Lidar1"
       horizontalResolution 360
-      fieldOfView 3.15
+      fieldOfView 6.28
       maxRange 2
     }
     DEF BODY Pose {
@@ -1124,9 +1124,23 @@ DEF PIONEER_3 Robot {
 }
 
 ### Moving parts ###
-# Moving wall
-DEF MOVING_WALL Solid {
+# Moving wall 1
+DEF MOVING_WALL_1 Solid {
+  name "MOVING_WALL_1"
   translation -7 0.5 1
+  children [
+    Shape {
+      geometry Box { size 1 1 2 }
+    }
+  ]
+  boundingObject Box { size 1 1 2 }
+  physics NULL
+}
+
+# Moving wall 2
+DEF MOVING_WALL_2 Solid {
+  name "MOVING_WALL_2"
+  translation -7 8 1
   children [
     Shape {
       geometry Box { size 1 1 2 }

@@ -33,6 +33,14 @@ class RobotLog:
         self.is_idle = False
         self.in_obstacle_state = False
 
+    @staticmethod
+    def _seconds_to_mysql_time(seconds):
+        total_microseconds = max(0, int(round(seconds * 1_000_000)))
+        hours, remainder = divmod(total_microseconds, 3_600_000_000)
+        minutes, remainder = divmod(remainder, 60_000_000)
+        secs, micros = divmod(remainder, 1_000_000)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}.{micros:06d}"
+
     def start(self, sim_time):
         self.start_time = sim_time
         self.last_time = sim_time
@@ -73,6 +81,9 @@ class RobotLog:
         if target is not None and len(target) == 2:
             details += f", x={target[0]:.3f}, y={target[1]:.3f}"
         self.log_event(sim_time, "REACHED_TARGET", details)
+
+    def log_unexpected_behavior(self, sim_time, description):
+        self.log_event(sim_time, "UNEXPECTED_BEHAVIOR", description)
 
     def update(self, sim_time, linear_speed, angular_speed, idle_speed_threshold=1e-3):
         if self.start_time is None:   
@@ -120,28 +131,24 @@ class RobotLog:
         if log_dir:
             os.makedirs(log_dir, exist_ok=True)
 
-        run_payload = {
-            "sim_id": self.sim_id,
-            "controller_version": self.controller_version,
-            "started_at": self.start_time,
-            "ended_at": self.last_time,
-            "total_time": self.total_time,
-            "idle_time": self.idle_time,
-            "obstacle_count": self.obstacle_count,
-            "event_count": self.event_count,
-            "events": [
-                {
-                    "sim_id": sim_id,
-                    "sim_time": sim_time,
-                    "event_type": event_type,
-                    "details": details,
-                }
-                for sim_id, sim_time, event_type, details in self.events
-            ],
-        }
-
-        with open(self.log_file_path, "a", encoding="utf-8") as log_file:
-            log_file.write(json.dumps(run_payload) + "\n")
+        for sim_id, sim_time, event_type, details in self.events:
+            run_payload = {
+                "controller_version": self.controller_version,
+                "obstacle_count": self.obstacle_count,
+                "event": [
+                    {
+                        "sim_id": sim_id,
+                        "sim_time": sim_time,
+                        "event_type": event_type,
+                        "details": details,
+                    }
+                ],
+            }
+            with open(self.log_file_path, "a", encoding="utf-8") as log_file:
+                log_file.write(json.dumps(run_payload) + "\n")
+        
+        # FIXME: REMOVE ONCE DATABASE IS VERIFIED WORKING 
+        # self.events = []
 
     def save_to_database(self):
         """
@@ -154,7 +161,7 @@ class RobotLog:
         db_port = int(os.getenv("DB_PORT", 3306))
         db_user = os.getenv("DB_USER", "root")
         db_password = os.getenv("DB_PASSWORD", "agv_pass") # Updated to match your docker container
-        db_name = os.getenv("DB_NAME", "robot_db")
+        db_name = os.getenv("DB_NAME", "agv_data")
 
         conn = None
         cursor = None
@@ -167,6 +174,12 @@ class RobotLog:
                 database=db_name
             )
             cursor = conn.cursor()
+            
+            insert_query_simulations = """
+                INSERT INTO Simulations (
+                    id, controller_version, total_sim_time, obstacle_count, total_idle_time, event_count
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+            """
 
             insert_query_events = """
                 INSERT INTO Events (
@@ -174,39 +187,78 @@ class RobotLog:
                 ) VALUES (%s, %s, %s, %s)
             """
 
-            insert_query_simulations = """
-                INSERT INTO Simulations (
-                    id, total_sim_time, obstacle_count, total_idle_time, event_count
-                ) VALUES (%s, %s, %s, %s)
-            """
-
             insert_query_events_telemetry = """
-                INSERT INTO Simulations (
-                    id, sim_id, event_time, state_x, state_y, state_theta, 
+                INSERT INTO EventTelemetry (
+                    sim_id, event_time, state_x, state_y, state_theta,
                     gps_x, gps_y, gps_dx, gps_dy, error_distance, error_heading,
                     wheel_vel_left, wheel_vel_right, robot_vel_linear, robot_vel_angular
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
+
+            db_events = [
+                (sim_id, self._seconds_to_mysql_time(sim_time), event_type, details)
+                for sim_id, sim_time, event_type, details in self.events
+            ]
+
+            db_event_telemetry = [
+                (
+                    sim_id,
+                    self._seconds_to_mysql_time(event_time),
+                    state_x,
+                    state_y,
+                    state_theta,
+                    gps_x,
+                    gps_y,
+                    gps_dx,
+                    gps_dy,
+                    error_distance,
+                    error_heading,
+                    wheel_vel_left,
+                    wheel_vel_right,
+                    robot_vel_linear,
+                    robot_vel_angular,
+                )
+                for (
+                    sim_id,
+                    event_time,
+                    state_x,
+                    state_y,
+                    state_theta,
+                    gps_x,
+                    gps_y,
+                    gps_dx,
+                    gps_dy,
+                    error_distance,
+                    error_heading,
+                    wheel_vel_left,
+                    wheel_vel_right,
+                    robot_vel_linear,
+                    robot_vel_angular,
+                ) in self.event_telemetry
+            ]
+
+            # TODO: FIX: CAN ONLYU SAVE ONCE PER SIMULATION BECAUSE OF PRIMARY KEY CONSTRAINT
+            cursor.execute(insert_query_simulations, (
+                self.sim_id,
+                self.controller_version,
+                self._seconds_to_mysql_time(self.total_time),
+                self.obstacle_count,
+                self._seconds_to_mysql_time(self.idle_time),
+                self.event_count
+            ))
+            conn.commit()
+            print("Successfully saved simulation summary to the database.")
+
+
             # Batch insert using executemany for high performance
-            cursor.executemany(insert_query_events, self.events)
+            cursor.executemany(insert_query_events, db_events)
             conn.commit()
             print(f"Successfully saved {len(self.events)} event records to the database.")
             self.events = []
             print("Cleared events after saving to database.")
 
-            # TODO: FIX: CAN ONLYU SAVE ONCE PER SIMULATION BECAUSE OF PRIMARY KEY CONSTRAINT
-            # cursor.execute(insert_query_simulations, (
-            #     self.sim_id,
-            #     self.controller_version,
-            #     self.total_time,
-            #     self.obstacle_count,
-            #     self.idle_time,
-            #     self.event_count
-            # ))
-            # conn.commit()
-            # print("Successfully saved simulation summary to the database.")
 
-            cursor.executemany(insert_query_events_telemetry, self.event_telemetry)
+            cursor.executemany(insert_query_events_telemetry, db_event_telemetry)
             conn.commit()
             print(f"Successfully saved {len(self.event_telemetry)} event telemetry records to the database.")
             self.event_telemetry = []  

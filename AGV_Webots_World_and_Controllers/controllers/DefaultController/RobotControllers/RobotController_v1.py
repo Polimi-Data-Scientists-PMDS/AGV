@@ -64,7 +64,8 @@ class RobotController_v1:
         self.CONTROL_VISION_DISTANCE = 2 # (m) distance where the robot can see
         #self.LIDAR_VISION_DISTANCE = 2 # (m) distance that the lidar sees
         self.SAFE_DISTANCE = 2 # (m) distance from where to avoid obstacles
-        self.LIDAR_FOV = 180
+        self.COLLISION_DISTANCE = 0.1 # (m) distance where it finds a collision
+        self.LIDAR_FOV = 360 # 180
         self.K_DISTANCE = 0.5 # distance gain 
         self.K_HEADING = 0.6 # heading gain - TO BE TUNED
         self.MAX_LIN_VEL = 0.4 # (m/s) - TO BE TUNED
@@ -302,9 +303,16 @@ class RobotController_v1:
                     return i
             return None
         
+        # --- 0. COLLISION DETECTION ---
+        if min(x[1] for x in pointcloud) < self.COLLISION_DISTANCE:
+            print(f"COLLISION DETECTED")
+            self.logger.log_unexpected_behaviour(self.robot.get_time(), "Collision detected, stopping.")
+            self.avoidance_side = 0
+            return 0.0, 0.0
+
         # --- 1. SETUP ---
-        NUM_SECTORS = 32
-        PADDING = 3
+        NUM_SECTORS = 64
+        PADDING = 4
         fov = self.lidar.getFov()
         sector_width = fov / NUM_SECTORS
         unnamed_sectors = ['f'] * NUM_SECTORS
@@ -332,9 +340,9 @@ class RobotController_v1:
 
 
         # --- 3. ASSIGN IDS TO THE SECTORS ---
-        print("used obstacle ids:", self.used_obstacle_ids)
-        print("used space ids:", self.used_space_ids)
-        print(f"UNPROCESSED RADAR: [{' '.join(('|' if s == 'o' else '.') for s in unnamed_sectors)}] \n")
+        # print("used obstacle ids:", self.used_obstacle_ids)
+        # print("used space ids:", self.used_space_ids)
+        # print(f"UNPROCESSED RADAR: [{' '.join(('|' if s == 'o' else '.') for s in unnamed_sectors)}] \n")
         sectors = unnamed_sectors.copy()
         if self.previous_scan is None:
             #print("NO PREV SCAN")
@@ -364,7 +372,7 @@ class RobotController_v1:
                     sectors[i] = self.previous_scan[i]
                 elif not is_old_obstacle and not is_new_obstacle:
                     sectors[i] = self.previous_scan[i]
-            print(f"RADAR AFTER STEP 1: [{' '.join(str(s) for s in sectors)}] \n")
+            # print(f"RADAR AFTER STEP 1: [{' '.join(str(s) for s in sectors)}] \n")
             # 2 forward id propagation
             prev_id = None
             is_prev_obstacle = None
@@ -378,7 +386,7 @@ class RobotController_v1:
                         sectors[i] = prev_id
                     elif unnamed_sectors[i] == 'f' and is_prev_obstacle is False:
                         sectors[i] = prev_id
-            print(f"RADAR AFTER STEP 2: [{' '.join(str(s) for s in sectors)}] \n")
+            # print(f"RADAR AFTER STEP 2: [{' '.join(str(s) for s in sectors)}] \n")
             # backward id propagation
             next_id = None
             is_next_obstacle = None
@@ -392,7 +400,7 @@ class RobotController_v1:
                         sectors[i] = next_id
                     elif unnamed_sectors[i] == 'f' and is_next_obstacle is False:
                         sectors[i] = next_id
-            print(f"RADAR AFTER STEP 3: [{' '.join(str(s) for s in sectors)}] \n")
+            # print(f"RADAR AFTER STEP 3: [{' '.join(str(s) for s in sectors)}] \n")
             # new id assignment 
             prev_id = None
             prev_was_obstacle = None
@@ -460,7 +468,13 @@ class RobotController_v1:
                     best_sector_angle = sector_angle
 
         # update the lock
-        if original_sector_index != best_sector_index: # if there is an obstacle in the path
+        if best_sector_index is None: # filled with obstacles -> no way to go
+            print(f"RADAR: [FILLED] NO PATH - STOP")
+            self.logger.log_unexpected_behaviour(self.robot.get_time(), "No path found, stopping.")
+            self.avoidance_side = 0
+            return 0.0, 0.0
+        
+        elif original_sector_index != best_sector_index: # if there is an obstacle in the path
             # -> add lock
             self.locked_obstacle = sectors[original_sector_index]
             self.locked_space = sectors[best_sector_index]
@@ -469,18 +483,17 @@ class RobotController_v1:
             self.locked_obstacle = None
             self.locked_space = None
 
-        print(f"LOCKED ON SPACE: {self.locked_space}")
-        print(f"LOCKED ON OBSTACLE: {self.locked_obstacle}")
+        # print(f"LOCKED ON SPACE: {self.locked_space}")
+        # print(f"LOCKED ON OBSTACLE: {self.locked_obstacle}")
         
-        if best_sector_index is None:
-            print(f"RADAR: [FILLED] NO PATH - STOP")
-            self.avoidance_side = 0
-            return 0.0, 0.0
     
         visual_map = ""
         for i, s in enumerate(sectors):
             # char = '|' if s == 1 else '.'
             char = str(s)
+            if s < 0:
+                char = '.'
+
             if i == original_sector_index:
                 char = 'X'
             if i == best_sector_index:
@@ -490,7 +503,8 @@ class RobotController_v1:
             visual_map += char + " "
 
         print(f"COMPLETE RADAR: [{visual_map}] | Steering: {best_sector_angle:.2f} | LOCKED ON: {self.locked_space}")
-        
+        print(f"POSITION: {self.state}")
+        print(f"GOAL: {self.goal_position}")
 
 
         # --- 5. EXECUTION ---
@@ -505,8 +519,8 @@ class RobotController_v1:
         # The "error" for the PID/Control is simply the relative angle of our target path
         new_heading_error = final_steering_angle
 
-        print(f"OLD HEADING ERROR: {heading_e:.2f}")
-        print(f"STEERING TOWARD: {new_heading_error:.2f}")
+        # print(f"OLD HEADING ERROR: {heading_e:.2f}")
+        # print(f"STEERING TOWARD: {new_heading_error:.2f}")
 
         return dist_e * speed_factor, new_heading_error
 
