@@ -70,6 +70,7 @@ class RobotLog:
                     data.get("robot_velocities", {}).get("angular", 0.0),
                 )
             except json.JSONDecodeError:
+                print(f"Warning: Failed to decode JSON from realtime log for event telemetry at sim_time={sim_time}. Logging with default values.")
                 x = (self.sim_id, sim_time, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0, 0.0, 0.0)
     
         self.event_telemetry.append(x)
@@ -147,8 +148,8 @@ class RobotLog:
             with open(self.log_file_path, "a", encoding="utf-8") as log_file:
                 log_file.write(json.dumps(run_payload) + "\n")
         
-        # FIXME: REMOVE ONCE DATABASE IS VERIFIED WORKING 
-        # self.events = []
+        # TODO: REMOVE ONCE DATABASE IS VERIFIED WORKING 
+        self.events = []
 
     def save_to_database(self):
         """
@@ -237,7 +238,7 @@ class RobotLog:
                 ) in self.event_telemetry
             ]
 
-            # TODO: FIX: CAN ONLYU SAVE ONCE PER SIMULATION BECAUSE OF PRIMARY KEY CONSTRAINT
+            # FIXME: CAN ONLY SAVE ONCE PER SIMULATION BECAUSE OF PRIMARY KEY CONSTRAINT
             cursor.execute(insert_query_simulations, (
                 self.sim_id,
                 self.controller_version,
