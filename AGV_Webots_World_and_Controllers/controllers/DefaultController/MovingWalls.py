@@ -1,12 +1,28 @@
-from RobotControllers.RobotController_v1 import RobotController_v1
+import numpy as np
 
 
 class MovingWalls:
-    def __init__(self, timestep, controller_robot):
+    def __init__(self, timestep, controller_robot, name):
         self.TIME_STEP = timestep
-        self.wall = controller_robot.getFromDef("MOVING_WALL")
+        self.wall = controller_robot.getFromDef("MOVING_WALL" + name)
         self.position = self.wall.getField("translation")
+        self.initial_position = self.position.getSFVec3f()
 
-    def move_wall(self, t):
-        y = 3 * __import__("math").sin(t)
-        self.position.setSFVec3f([-7, y, 0.0])
+    
+    
+    def move_wall(self, t, amplitude, frequency, axis):
+        current = self.position.getSFVec3f()
+        offset = amplitude * np.sin(frequency * t)
+
+        if axis == 'x':
+            self.position.setSFVec3f([
+                self.initial_position[0] + offset,
+                current[1],
+                current[2],
+            ])
+        else:
+            self.position.setSFVec3f([
+                current[0],
+                self.initial_position[1] + offset,
+                current[2],
+            ])
