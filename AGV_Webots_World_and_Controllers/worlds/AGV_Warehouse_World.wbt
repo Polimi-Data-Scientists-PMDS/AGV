@@ -45,6 +45,18 @@ DEF PIONEER_3 Robot {
       fieldOfView 3.14
       maxRange 2
     }
+
+
+    Camera {
+      name "camera"
+      width 640
+      height 480
+      fieldOfView 1.5
+      rotation 0 1 0 0
+      translation 0 0 0.8
+    }
+  
+
     DEF BODY Pose {
       rotation 0.5773502691896258 -0.5773502691896258 -0.5773502691896258 2.094395
       children [
@@ -1536,5 +1548,5 @@ Solid {
         }
     ]
     name "Work_Island_8"
-    boundingObject USE ISLAND_7
+    boundingObject USE ISLAND_8
 }
