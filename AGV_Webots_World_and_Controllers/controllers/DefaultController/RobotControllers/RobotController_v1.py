@@ -110,6 +110,10 @@ class RobotController_v1:
         self.previous_scan = None
         self.locked_obstacle = None
         self.locked_space = None
+        self.is_escaping = False
+        self.escape_stop_time = 0.0
+        self.escape_time_rotation = 6.0
+        self.escape_time_forward = 8.0
         print("Lidar set up correctly!")
         print("RangeImage size:", len(self.lidar.getRangeImage()))
         print("Horizontal resolution:", self.lidar.getHorizontalResolution())
@@ -443,6 +447,23 @@ class RobotController_v1:
         if self.locked_obstacle not in sectors or self.locked_space not in sectors:
             self.locked_obstacle = None
             self.locked_space = None
+
+        # escape from dead end
+        if self.is_escaping:
+            visual_map = ""
+            for i, s in enumerate(sectors):
+                # char = '|' if s == 1 else '.'
+                char = str(s)
+                visual_map += char + " "
+            print(f"COMPLETE RADAR: [{visual_map}] | Steering: {best_sector_angle:.2f} | LOCKED ON: {self.locked_space}")
+            free_space_id = next((x for x in sectors if x < 0), None)
+            if free_space_id is not None: # if there a free sector
+                # lock on that and continue
+                self.locked_space = free_space_id
+            else:
+                # keeps rotating
+                return self.CONTROL_VISION_DISTANCE, 2.5
+
         
         original_sector_index = None
         min_original_error = float('inf')
@@ -467,12 +488,19 @@ class RobotController_v1:
                     best_sector_index = i
                     best_sector_angle = sector_angle
 
-        # update the lock
+        # --- 4. CHOOSE DIRECTION ---
         if best_sector_index is None: # filled with obstacles -> no way to go
-            print(f"RADAR: [FILLED] NO PATH - STOP")
-            self.logger.log_unexpected_behavior(self.robot.getTime(), "No path found, stopping.")
-            self.avoidance_side = 0
-            return 0.0, 0.0
+            print("NO PATH - ESCAPE")
+            self.is_escaping = True
+            self.locked_obstacle = sectors[0]
+            return self.CONTROL_VISION_DISTANCE, 2.5 # start rotation
+
+        # update the lock
+        #if best_sector_index is None: # filled with obstacles -> no way to go
+         #   print(f"RADAR: [FILLED] NO PATH - STOP")
+          #  self.logger.log_unexpected_behavior(self.robot.getTime(), "No path found, stopping.")
+           # self.avoidance_side = 0
+            #return 0.0, 0.0
         
         elif original_sector_index != best_sector_index: # if there is an obstacle in the path
             # -> add lock
