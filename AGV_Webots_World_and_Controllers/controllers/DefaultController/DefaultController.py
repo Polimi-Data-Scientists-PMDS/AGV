@@ -23,8 +23,8 @@ from MovingWalls import MovingWalls
 # MAIN
 
 goal_positions = [
-    (18.75, 2.25), # Pickup point 7
-    (6.75, -4.5),  # Charging station
+    # (18.75, 2.25), # Pickup point 7
+    # (6.75, -4.5),  # Charging station
     (-29.3, 4),    # Dropoff point 01
     (-13.5, 6.25), # Pickup point 3
     (-8.25, 4.5),  # Pickup point 4

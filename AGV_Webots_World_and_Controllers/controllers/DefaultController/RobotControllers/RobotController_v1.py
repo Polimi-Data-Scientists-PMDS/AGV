@@ -101,6 +101,10 @@ class RobotController_v1:
         self.prevL, self.prevR = 0, 0
         print("Motor encoders set up correctly!")
 
+        # Camera
+        self.camera = self.robot.getDevice("camera")
+        self.camera.enable(self.initial_timestep)
+
         # Lidar
         self.lidar = self.robot.getDevice('Lidar1')
         self.lidar.enable(self.initial_timestep)
@@ -319,7 +323,7 @@ class RobotController_v1:
         PADDING = 4
         fov = self.lidar.getFov()
         sector_width = fov / NUM_SECTORS
-        unnamed_sectors = ['f'] * NUM_SECTORS
+        unnamed_sectors = ['f'] * NUM_SECTORS # f is free, o is obstacle
         obstacle_found = False
 
         # --- 2. MAP LIDAR ---
@@ -425,6 +429,20 @@ class RobotController_v1:
                         else:
                             sectors[i] = prev_id
                 prev_was_obstacle = is_obstacle
+            
+            # propagation of similar types
+            prec_type = None
+            prec_id = None
+            for i in range(NUM_SECTORS):
+                curr_type = unnamed_sectors[i]
+                if (curr_type == prec_type):
+                    # propagate id
+                    sectors[i] = prec_id
+                else:
+                    prec_id = sectors[i]
+                prec_type = unnamed_sectors[i]
+
+
 
         if 0 in sectors or None in sectors:
             raise Exception("OBSTACLE AVOIDANCE -- Missing a sector assignment!")
@@ -452,17 +470,18 @@ class RobotController_v1:
         if self.is_escaping:
             visual_map = ""
             for i, s in enumerate(sectors):
-                # char = '|' if s == 1 else '.'
                 char = str(s)
                 visual_map += char + " "
-            print(f"COMPLETE RADAR: [{visual_map}] | Steering: {best_sector_angle:.2f} | LOCKED ON: {self.locked_space}")
+            print(f"COMPLETE RADAR: [{visual_map}] | LOCKED ON: {self.locked_space} & {self.locked_obstacle}")
+
             free_space_id = next((x for x in sectors if x < 0), None)
             if free_space_id is not None: # if there a free sector
                 # lock on that and continue
                 self.locked_space = free_space_id
+                self.is_escaping = False
             else:
                 # keeps rotating
-                return self.CONTROL_VISION_DISTANCE, 2.5
+                return self.CONTROL_VISION_DISTANCE, -2
 
         
         original_sector_index = None
@@ -493,7 +512,7 @@ class RobotController_v1:
             print("NO PATH - ESCAPE")
             self.is_escaping = True
             self.locked_obstacle = sectors[0]
-            return self.CONTROL_VISION_DISTANCE, 2.5 # start rotation
+            return self.CONTROL_VISION_DISTANCE, -2 # start rotation
 
         # update the lock
         #if best_sector_index is None: # filled with obstacles -> no way to go
@@ -530,7 +549,7 @@ class RobotController_v1:
                 char = '*'
             visual_map += char + " "
 
-        print(f"COMPLETE RADAR: [{visual_map}] | Steering: {best_sector_angle:.2f} | LOCKED ON: {self.locked_space}")
+        print(f"COMPLETE RADAR: [{visual_map}] | Steering: {best_sector_angle:.2f} | LOCKED ON: {self.locked_space} & {self.locked_obstacle}")
         print(f"POSITION: {self.state}")
         print(f"GOAL: {self.goal_position}")
 
