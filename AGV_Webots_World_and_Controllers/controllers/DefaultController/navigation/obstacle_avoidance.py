@@ -1,34 +1,21 @@
 # navigation/obstacle_avoidance.py
 import numpy as np
 
-class ObstacleAvoider:
-    def __init__(self, config, logger):
+class LidarObstacleAvoider:
+    def __init__(self, config, logger, lidar_specs):
         self.config = config
         self.logger = logger
-        
+        self.fov = lidar_specs[0]
+
         # State tracking from your original code
         self.used_obstacle_ids = set()
         self.used_space_ids = set()
         self.previous_scan = None
         self.locked_obstacle = None
         self.locked_space = None
-        self.is_escaping = False
+        self.is_escaping_dead_end = False
 
-    def obstacle_avoidance(self, pointcloud, dist_e, heading_e, current_time, state, goal_position, fov, max_range):
-        def get_obstacle_id():
-            for i in range(1, NUM_SECTORS):
-                if i not in self.used_obstacle_ids:
-                    self.used_obstacle_ids.add(i)
-                    return i
-            return None
-
-        def get_space_id():
-            for i in range(-1, -NUM_SECTORS, -1):
-                if i not in self.used_space_ids:
-                    self.used_space_ids.add(i)
-                    return i
-            return None
-        
+    def obstacle_avoidance(self, pointcloud, dist_e, heading_e, current_time):
         # --- 0. COLLISION DETECTION ---
         if pointcloud and min(x[1] for x in pointcloud) < self.config.COLLISION_DISTANCE:
             print(f"COLLISION DETECTED")
@@ -36,26 +23,12 @@ class ObstacleAvoider:
             return 0.0, 0.0
 
         # --- 1. SETUP ---
-        NUM_SECTORS = 32
-        PADDING = 4
-        sector_width = fov / NUM_SECTORS
-        unnamed_sectors = ['f'] * NUM_SECTORS # f is free, o is obstacle
-        obstacle_found = False
+        self.sector_width = self.fov / self.config.NUM_SECTORS
 
         # --- 2. MAP LIDAR ---
-        for angle, dist in pointcloud:
-            if dist < self.config.SAFE_DISTANCE and (dist_e >= self.config.SAFE_DISTANCE or dist < dist_e):
-                sector_id = int((angle + fov/2) / sector_width) % NUM_SECTORS
-                if 0 <= sector_id < NUM_SECTORS:
-                    unnamed_sectors[sector_id] = 'o'
-                    obstacle_found = True
-                    for p in range(1, PADDING + 1):
-                        if sector_id - p >= 0:
-                            unnamed_sectors[sector_id - p] = 'o'
-                        if sector_id + p < NUM_SECTORS:
-                            unnamed_sectors[sector_id + p] = 'o'
+        unnamed_sectors = self.__calculate_sectors(pointcloud, dist_e)
         
-        if not obstacle_found:
+        if not 'obs' in unnamed_sectors:
             self.used_obstacle_ids.clear()
             self.used_space_ids.clear()
             self.previous_scan = None
@@ -64,26 +37,119 @@ class ObstacleAvoider:
             return dist_e, heading_e
 
         # --- 3. ASSIGN IDS TO THE SECTORS ---
+        sectors = self.__assign_ids(unnamed_sectors)
+        self.previous_scan = sectors.copy()
+
+
+        # --- 4. CHOOSE DIRECTION ---
+        # UNLOCK CHECK
+        if self.locked_obstacle not in sectors or self.locked_space not in sectors: # if either of the two locked objects are missing
+            self.locked_obstacle = None
+            self.locked_space = None
+
+        # ESCAPING DEAD END
+        if self.is_escaping_dead_end:
+            if self.config.PRINT_OBSTACLE_AVOIDANCE:
+                self.__visualize_map(sectors)
+            
+            free_space_id = next((x for x in sectors if x < 0), None)
+            if free_space_id is not None: 
+                self.locked_space = free_space_id
+                self.is_escaping_dead_end = False
+            else:
+                return self.config.CONTROL_VISION_DISTANCE, -2
+
+        # CALCULATE FINAL DIRECTION
+        ideal_direction_idx, actual_direction_idx = self.__choose_direction(sectors, heading_e)
+
+    
+        # DEAD END
+        if actual_direction_idx is None: 
+            print("NO PATH FOUND - SWITCH TO ESCAPE MODE")
+            self.is_escaping_dead_end = True
+            self.locked_obstacle = sectors[0]
+            return self.config.CONTROL_VISION_DISTANCE, -2 
+        
+        # CANNOT FOLLOW IDEAL DIRECTION
+        elif ideal_direction_idx != actual_direction_idx: 
+            # IF IDEAL DIRECTION IS FREE -> FOLLOW THAT AND RELEASE LOCK
+            if sectors[ideal_direction_idx] < 0: # used for moving obstacles
+                self.locked_obstacle = None
+                self.locked_space = None
+                actual_direction_idx = ideal_direction_idx
+            else:
+                # LOCK ON THAT OBJECT
+                self.locked_obstacle = sectors[ideal_direction_idx]
+                self.locked_space = sectors[actual_direction_idx]
+            
+        # UNLOCK
+        else:
+            self.locked_obstacle = None
+            self.locked_space = None
+
+        # VISUALIZATIONS
+        if self.config.PRINT_OBSTACLE_AVOIDANCE:
+            self.__visualize_map(sectors, ideal_direction_idx, actual_direction_idx)
+
+
+        # --- 5. EXECUTION ---
+        actual_direction_angle = self.__calculate_sector_angle(actual_direction_idx)
+        final_steering_angle = heading_e if ideal_direction_idx == actual_direction_idx else actual_direction_angle
+        speed_factor = max(0.2, np.cos(final_steering_angle))
+
+        return dist_e * speed_factor, final_steering_angle
+    
+
+    def __get_new_obstacle_id(self):
+        for i in range(1, self.config.NUM_SECTORS):
+            if i not in self.used_obstacle_ids:
+                self.used_obstacle_ids.add(i)
+                return i
+        return None
+
+    def __get_new_space_id(self):
+        for i in range(-1, -self.config.NUM_SECTORS, -1):
+            if i not in self.used_space_ids:
+                self.used_space_ids.add(i)
+                return i
+        return None
+    
+    def __calculate_sectors(self, pointcloud, dist_e):
+        unnamed_sectors = ['free'] * self.config.NUM_SECTORS
+        for angle, dist in pointcloud:
+            if dist < self.config.SAFE_DISTANCE and (dist_e >= self.config.SAFE_DISTANCE or dist < dist_e):
+                sector_id = int((angle + self.fov/2) / self.sector_width) % self.config.NUM_SECTORS
+                if 0 <= sector_id < self.config.NUM_SECTORS:
+                    unnamed_sectors[sector_id] = 'obs'
+                    for p in range(1, self.config.PADDING + 1):
+                        if sector_id - p >= 0:
+                            unnamed_sectors[sector_id - p] = 'obs'
+                        if sector_id + p < self.config.NUM_SECTORS:
+                            unnamed_sectors[sector_id + p] = 'obs'
+        return unnamed_sectors
+    
+    def __assign_ids(self, unnamed_sectors):
         sectors = unnamed_sectors.copy()
         if self.previous_scan is None:
+            # no prev scan -> assign new ids to all
             prev_id = None
             prev_was_obstacle = None
             for i, s in enumerate(unnamed_sectors):
-                if s == 'o': 
+                if s == 'obs': 
                     if not prev_was_obstacle or i == 0:
-                        prev_id = get_obstacle_id()
+                        prev_id = self.__get_new_obstacle_id()
                     sectors[i] = prev_id
                     prev_was_obstacle = True
                 else: 
                     if prev_was_obstacle or i == 0:
-                        prev_id = get_space_id()
+                        prev_id = self.__get_new_space_id()
                     sectors[i] = prev_id
                     prev_was_obstacle = False
         else:
             # 1 assign ids to this sector of the same position
-            for i in range(NUM_SECTORS):
+            for i in range(self.config.NUM_SECTORS):
                 is_old_obstacle = self.previous_scan[i] > 0
-                is_new_obstacle = unnamed_sectors[i] == 'o'
+                is_new_obstacle = unnamed_sectors[i] == 'obs'
                 if is_old_obstacle and is_new_obstacle:
                     sectors[i] = self.previous_scan[i]
                 elif not is_old_obstacle and not is_new_obstacle:
@@ -92,56 +158,56 @@ class ObstacleAvoider:
             # 2 forward id propagation
             prev_id = None
             is_prev_obstacle = None
-            for i in range(NUM_SECTORS):
-                has_id = sectors[i] not in ['f', 'o']
+            for i in range(self.config.NUM_SECTORS):
+                has_id = sectors[i] not in ['free', 'obs']
                 if has_id:
                     prev_id = sectors[i]
-                    is_prev_obstacle = unnamed_sectors[i] == 'o'
+                    is_prev_obstacle = unnamed_sectors[i] == 'obs'
                 else:
-                    if unnamed_sectors[i] == 'o' and is_prev_obstacle:
+                    if unnamed_sectors[i] == 'obs' and is_prev_obstacle:
                         sectors[i] = prev_id
-                    elif unnamed_sectors[i] == 'f' and is_prev_obstacle is False:
+                    elif unnamed_sectors[i] == 'free' and is_prev_obstacle is False:
                         sectors[i] = prev_id
             
             # 3 backward id propagation
             next_id = None
             is_next_obstacle = None
-            for i in range(NUM_SECTORS-1, -1, -1):
-                has_id = sectors[i] not in ['f', 'o']
+            for i in range(self.config.NUM_SECTORS-1, -1, -1):
+                has_id = sectors[i] not in ['free', 'obs']
                 if has_id:
                     next_id = sectors[i]
-                    is_next_obstacle = unnamed_sectors[i] == 'o'
+                    is_next_obstacle = unnamed_sectors[i] == 'obs'
                 else:
-                    if unnamed_sectors[i] == 'o' and is_next_obstacle:
+                    if unnamed_sectors[i] == 'obs' and is_next_obstacle:
                         sectors[i] = next_id
-                    elif unnamed_sectors[i] == 'f' and is_next_obstacle is False:
+                    elif unnamed_sectors[i] == 'free' and is_next_obstacle is False:
                         sectors[i] = next_id
             
-            # 4 new id assignment 
+            # 4 new id assignment (to isles)
             prev_id = None
             prev_was_obstacle = None
-            for i in range(NUM_SECTORS):
-                has_id = sectors[i] not in ['f', 'o']
-                is_obstacle = unnamed_sectors[i] == 'o'
+            for i in range(self.config.NUM_SECTORS):
+                has_id = sectors[i] not in ['free', 'obs']
+                is_obstacle = unnamed_sectors[i] == 'obs'
                 if not has_id:
                     if is_obstacle:
                         if not prev_was_obstacle or i == 0:
-                            sectors[i] = get_obstacle_id()
+                            sectors[i] = self.__get_new_obstacle_id()
                             prev_id = sectors[i]
                         else:
                             sectors[i] = prev_id
                     else:
                         if prev_was_obstacle or i == 0:
-                            sectors[i] = get_space_id()
+                            sectors[i] = self.__get_new_space_id()
                             prev_id = sectors[i]
                         else:
                             sectors[i] = prev_id
                 prev_was_obstacle = is_obstacle
             
-            # 5 propagation of similar types
+            # 5 propagation of similar ids and types
             prec_type = None
             prec_id = None
-            for i in range(NUM_SECTORS):
+            for i in range(self.config.NUM_SECTORS):
                 curr_type = unnamed_sectors[i]
                 if (curr_type == prec_type):
                     sectors[i] = prec_id
@@ -149,19 +215,17 @@ class ObstacleAvoider:
                     prec_id = sectors[i]
                 prec_type = unnamed_sectors[i]
 
-            # 6 final check
-            for i in range(NUM_SECTORS):
-                obstacle_ok = unnamed_sectors[i] == 'o' and sectors[i] > 0
-                free_ok = unnamed_sectors[i] == 'f' and sectors[i] < 0
+            # 6 final check of similarity to the unnamed one
+            for i in range(self.config.NUM_SECTORS):
+                obstacle_ok = unnamed_sectors[i] == 'obs' and sectors[i] > 0
+                free_ok = unnamed_sectors[i] == 'free' and sectors[i] < 0
                 if not (obstacle_ok or free_ok):
                     raise Exception(f"OBSTACLE AVOIDANCE: ID assignments failed on {i}: {unnamed_sectors} {sectors}")
 
         if 0 in sectors or None in sectors:
-            raise Exception("OBSTACLE AVOIDANCE -- Missing a sector assignment!")
-            
-        self.previous_scan = sectors.copy()
-
-        # CLEAN USED OBSTACLES BUFFER
+            raise Exception("OBSTACLE AVOIDANCE: Missing a sector assignment!")
+        
+        # CLEAN IDS BUFFER
         self.used_obstacle_ids.clear()
         self.used_space_ids.clear()
         for s in sectors:
@@ -169,86 +233,53 @@ class ObstacleAvoider:
                 self.used_obstacle_ids.add(s)
             else:
                 self.used_space_ids.add(s)
-
-        # --- 4. CHOOSE DIRECTION ---
-        # We find where we WANT to go before we look at locks or obstacles
-        original_sector_index = None
-        min_original_error = float('inf')
-        for i in range(NUM_SECTORS):
-            sector_angle = fov/2 - (i + 0.5) * sector_width 
-            error = abs(np.arctan2(np.sin(sector_angle - heading_e), np.cos(sector_angle - heading_e)))
-            if error < min_original_error:
-                min_original_error = error
-                original_sector_index = i
-
-        # This is what stops the "Ghost Locking" on moving obstacles
-        if sectors[original_sector_index] < 0:
-            self.locked_obstacle = None
-            self.locked_space = None
-
-        if self.locked_obstacle not in sectors or self.locked_space not in sectors:
-            self.locked_obstacle = None
-            self.locked_space = None
-
-        if self.is_escaping:
-            visual_map = " ".join(str(s) for s in sectors)
-            print(f"COMPLETE RADAR: [{visual_map}] | LOCKED ON: {self.locked_space} & {self.locked_obstacle}")
-
-            free_space_id = next((x for x in sectors if x < 0), None)
-            if free_space_id is not None: 
-                self.locked_space = free_space_id
-                self.is_escaping = False
-            else:
-                return self.config.CONTROL_VISION_DISTANCE, -2
-
-        original_sector_index = None
-        min_original_error = float('inf')
-        best_sector_index = None
-        best_sector_angle = None
-        min_free_error = float('inf')
         
-        for i in range(NUM_SECTORS):
-            sector_angle = fov/2 - (i + 0.5) * sector_width 
+        return sectors
+    
+    def __calculate_sector_angle(self, i):
+        return self.fov/2 - (i + 0.5) * self.sector_width 
+    
+    def __choose_direction(self, sectors, heading_e):
+        ideal_direction_idx = None
+        actual_direction_idx = None
+        min_ideal_error = float('inf')
+        min_actual_error = float('inf')
+
+        for i in range(self.config.NUM_SECTORS):
+            sector_angle = self.__calculate_sector_angle(i)
             error = abs(np.arctan2(np.sin(sector_angle - heading_e), np.cos(sector_angle - heading_e)))
             
-            if error < min_original_error:
-                min_original_error = error
-                original_sector_index = i
+            # find best ideal sector
+            if error < min_ideal_error: 
+                min_ideal_error = error
+                ideal_direction_idx = i
 
+            # find best actual sector
             lock_ok = self.locked_space is None or self.locked_space == sectors[i]
             if sectors[i] < 0 and lock_ok: 
-                if error < min_free_error:
-                    min_free_error = error
-                    best_sector_index = i
-                    best_sector_angle = sector_angle
+                if error < min_actual_error:
+                    min_actual_error = error
+                    actual_direction_idx = i
 
-        if best_sector_index is None: 
-            print("NO PATH - ESCAPE")
-            self.is_escaping = True
-            self.locked_obstacle = sectors[0]
-            return self.config.CONTROL_VISION_DISTANCE, -2 
-        
-        elif original_sector_index != best_sector_index: 
-            self.locked_obstacle = sectors[original_sector_index]
-            self.locked_space = sectors[best_sector_index]
-        else:
-            self.locked_obstacle = None
-            self.locked_space = None
+        return ideal_direction_idx, actual_direction_idx
+
+    def __visualize_map(self, sectors, ideal_sector_index = None, actual_sector_index = None):
+        final_string = ""
 
         visual_map = ""
         for i, s in enumerate(sectors):
             char = '.' if s < 0 else str(s)
-            if i == original_sector_index: char = 'X'
-            if i == best_sector_index: char = 'O'
-            if i == original_sector_index and i == best_sector_index: char = '*'
+            if ideal_sector_index and actual_sector_index: 
+                if i == ideal_sector_index: char = 'X'
+                if i == actual_sector_index: char = 'O'
+                if i == ideal_sector_index and i == actual_sector_index: char = '*'
             visual_map += char + " "
+        final_string += f"COMPLETE RADAR: [{visual_map}]"
 
-        print(f"COMPLETE RADAR: [{visual_map}] | Steering: {best_sector_angle:.2f} | LOCKED ON: {self.locked_space} & {self.locked_obstacle}")
-        print(f"POSITION: {state}")
-        print(f"GOAL: {goal_position}")
+        if actual_sector_index:
+            steering_angle = self.__calculate_sector_angle(actual_sector_index)
+            final_string += f" | Steering: {steering_angle:.2f}"
 
-        # --- 5. EXECUTION ---
-        final_steering_angle = heading_e if original_sector_index == best_sector_index else best_sector_angle
-        speed_factor = max(0.2, np.cos(final_steering_angle))
+        final_string += f" | LOCKED ON: {self.locked_space} & {self.locked_obstacle}"
 
-        return dist_e * speed_factor, final_steering_angle
+        print(final_string)
