@@ -43,7 +43,10 @@ class LidarObstacleAvoider:
 
         # --- 4. CHOOSE DIRECTION ---
         # UNLOCK CHECK
-        if self.locked_obstacle not in sectors or self.locked_space not in sectors: # if either of the two locked objects are missing
+        lock_valid = self.locked_obstacle is not None and self.locked_space is not None
+        no_more_obstacle_lock = self.locked_obstacle not in sectors
+        no_more_free_lock = self.locked_space not in sectors
+        if lock_valid and (no_more_obstacle_lock or no_more_free_lock): # if either of the two locked objects are missing
             self.locked_obstacle = None
             self.locked_space = None
 
@@ -52,12 +55,15 @@ class LidarObstacleAvoider:
             if self.config.PRINT_OBSTACLE_AVOIDANCE:
                 self.__visualize_map(sectors)
             
-            free_space_id = next((x for x in sectors if x < 0), None)
+            # divide the sectors in two sides -> if the free spot is in the correct side then unlock
+            half = self.config.NUM_SECTORS//2
+            split_sectors = [sectors[:half], sectors[half:]]
+            free_space_id = next((x for x in split_sectors[self.escaping_side] if x < 0), None)
             if free_space_id is not None: 
                 self.locked_space = free_space_id
                 self.is_escaping_dead_end = False
             else:
-                return self.config.CONTROL_VISION_DISTANCE, -2
+                return 0, self.escape_sign*2
 
         # CALCULATE FINAL DIRECTION
         ideal_direction_idx, actual_direction_idx = self.__choose_direction(sectors, heading_e)
@@ -66,9 +72,15 @@ class LidarObstacleAvoider:
         # DEAD END
         if actual_direction_idx is None: 
             print("NO PATH FOUND - SWITCH TO ESCAPE MODE")
+            if self.config.PRINT_OBSTACLE_AVOIDANCE:
+                self.__visualize_map(sectors, ideal_direction_idx, actual_direction_idx)
+
             self.is_escaping_dead_end = True
+            self.escaping_side = 0 if ideal_direction_idx < self.config.NUM_SECTORS//2 else 1
+            self.escape_sign = 1 if self.escaping_side == 0 else -1
             self.locked_obstacle = sectors[0]
-            return self.config.CONTROL_VISION_DISTANCE, -2 
+            print(f"ESCAPING: {self.escaping_side} ")
+            return  0, self.escape_sign*2 
         
         # CANNOT FOLLOW IDEAL DIRECTION
         elif ideal_direction_idx != actual_direction_idx: 
@@ -269,10 +281,11 @@ class LidarObstacleAvoider:
         visual_map = ""
         for i, s in enumerate(sectors):
             char = '.' if s < 0 else str(s)
-            if ideal_sector_index and actual_sector_index: 
-                if i == ideal_sector_index: char = 'X'
-                if i == actual_sector_index: char = 'O'
-                if i == ideal_sector_index and i == actual_sector_index: char = '*'
+            ideal_ok = ideal_sector_index is not None
+            actual_ok = actual_sector_index is not None
+            if ideal_ok and i == ideal_sector_index: char = 'X'
+            if actual_ok and i == actual_sector_index: char = 'O'
+            if ideal_ok and actual_ok and i == ideal_sector_index and i == actual_sector_index: char = '*'
             visual_map += char + " "
         final_string += f"COMPLETE RADAR: [{visual_map}]"
 
