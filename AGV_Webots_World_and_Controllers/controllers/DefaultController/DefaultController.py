@@ -39,10 +39,6 @@ class AGVSimulation:
         self.last_print_time = 0.0
         self.last_db_save = 0.0
 
-
-
-
-
     def run(self):
         """The main simulation execution loop."""
         
