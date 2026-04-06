@@ -1,5 +1,5 @@
 CREATE TABLE Simulations (
-  id INTEGER PRIMARY KEY,
+  id INTEGER AUTO_INCREMENT PRIMARY KEY,
   controller_version VARCHAR(64) NOT NULL,
   total_sim_time TIME(6) NOT NULL,
   obstacle_count INTEGER NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE Events (
   sim_time TIME(6),
   e_type ENUM('START', 'STOP', 'IDLE_START','IDLE_END','OBSTACLE_ENCOUNTER','OBSTACLE_CLEARED','REACHED_TARGET', 'UNEXPECTED_BEHAVIOR') NOT NULL,
   details VARCHAR(128) NOT NULL,
-  PRIMARY KEY (sim_id, sim_time),
+  PRIMARY KEY (sim_id, sim_time, e_type),
   FOREIGN KEY (sim_id) REFERENCES Simulations(id)
 );
 
@@ -20,6 +20,7 @@ CREATE TABLE EventTelemetry (
   id INTEGER AUTO_INCREMENT PRIMARY KEY,
   sim_id INTEGER NOT NULL,
   event_time TIME(6) NOT NULL,
+  e_type ENUM('START', 'STOP', 'IDLE_START','IDLE_END','OBSTACLE_ENCOUNTER','OBSTACLE_CLEARED','REACHED_TARGET', 'UNEXPECTED_BEHAVIOR') NOT NULL,
   state_x DOUBLE NOT NULL,
   state_y DOUBLE NOT NULL,
   state_theta DOUBLE NOT NULL,
@@ -34,5 +35,5 @@ CREATE TABLE EventTelemetry (
   robot_vel_linear DOUBLE NOT NULL,
   robot_vel_angular DOUBLE NOT NULL,
   FOREIGN KEY (sim_id) REFERENCES Simulations(id),
-  FOREIGN KEY (sim_id, event_time) REFERENCES Events(sim_id, sim_time)
+  FOREIGN KEY (sim_id, event_time, e_type) REFERENCES Events(sim_id, sim_time, e_type)
 );
