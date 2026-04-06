@@ -26,6 +26,9 @@ class RobotConfig:
     LOG_INTERVAL_SEC = 5.0
     PRINT_INTERVAL_SEC = 0.5
 
+    # 5. VISUALIZATIONS 
+    PRINT_OBSTACLE_AVOIDANCE = True
+
 
 # List of targets
 CHARGING_STATION = (6.75, -4.5)
