@@ -6,7 +6,7 @@ import sys
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "RobotLog"))
+LOG_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "OldRobotLog"))
 if LOG_DIR not in sys.path:
     sys.path.append(LOG_DIR)
 ROBOT_CONTROLLER_v1_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "RobotControllers"))

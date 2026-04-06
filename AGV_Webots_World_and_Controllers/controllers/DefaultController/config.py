@@ -27,21 +27,29 @@ class RobotConfig:
     PRINT_INTERVAL_SEC = 0.5
 
 
-
 # List of targets
+CHARGING_STATION = (6.75, -4.5)
+DROPOFF_01 = (-29.3, 4)
+PICKUP_01 = (-24, 3.5)
+PICKUP_02 = (-18.5, 6.25)
+PICKUP_03 = (-13.5, 6.25)
+PICKUP_04 = (-8.25, 4.5)
+PICKUP_05 = (-2, 5.75)
+PICKUP_06 = (3.75, 5.75)
+PICKUP_07 = (18.75, 2.25)
 GOAL_POSITIONS = [
-    # (18.75, 2.25), # Pickup point 7
-    # (6.75, -4.5),  # Charging station
-    (-29.3, 4),    # Dropoff point 01
-    (-13.5, 6.25), # Pickup point 3
-    (-8.25, 4.5),  # Pickup point 4
-    (6.75, -4.5),  # Charging station
-    (-24, 3.5),    # Pickup point 1
-    (-29.3, 4),    # Dropoff point 01
-    (-18.5, 6.25), # Pickup point 2
-    (-2, 5.75),    # Pickup point 5
-    (3.75, 5.75),  # Pickup point 6
-    (-29.3, 4),    # Dropoff point 01
-    (18.75, 2.25), # Pickup point 7
-    (6.75, -4.5),  # Charging station
+    # PICKUP_07,          # Pickup point 7
+    # CHARGING_STATION,   # Charging station
+    DROPOFF_01,         # Dropoff point 01
+    PICKUP_03,          # Pickup point 3
+    PICKUP_04,          # Pickup point 4
+    CHARGING_STATION,   # Charging station
+    PICKUP_01,          # Pickup point 1
+    DROPOFF_01,         # Dropoff point 01
+    PICKUP_02,          # Pickup point 2
+    PICKUP_05,          # Pickup point 5
+    PICKUP_06,          # Pickup point 6
+    DROPOFF_01,         # Dropoff point 01
+    PICKUP_07,          # Pickup point 7
+    CHARGING_STATION,   # Charging station
 ]
