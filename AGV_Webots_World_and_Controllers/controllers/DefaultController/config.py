@@ -56,3 +56,23 @@ GOAL_POSITIONS = [
     PICKUP_07,          # Pickup point 7
     CHARGING_STATION,   # Charging station
 ]
+
+
+
+DYNAMIC_OBSTACLES = [
+    # Humans
+    {"def_name": "HUMAN_1", "amplitude": -8.5, "speed": 1, "axis": 'y'},
+    {"def_name": "HUMAN_2", "amplitude": 7.0, "speed": 1, "axis": 'x'},
+    {"def_name": "HUMAN_3", "amplitude": -14.0, "speed": 1, "axis": 'y'},
+    {"def_name": "HUMAN_4", "amplitude": -17.0, "speed": 1, "axis": 'x'},
+    {"def_name": "HUMAN_5", "amplitude": -6.0, "speed": 1, "axis": 'y'},
+    {"def_name": "HUMAN_6", "amplitude": 14.0, "speed": 1, "axis": 'x'},
+    {"def_name": "HUMAN_7", "amplitude": 8.0, "speed": 1, "axis": 'y'},
+    
+    # Forklifts
+    {"def_name": "FORKLIFT_1", "amplitude": 13.0, "speed": 1.5, "axis": 'x'},
+    {"def_name": "FORKLIFT_2", "amplitude": 40.0, "speed": 1.5, "axis": 'x'},
+    {"def_name": "FORKLIFT_3", "amplitude": 13.0, "speed": 1.5, "axis": 'y'},
+    {"def_name": "FORKLIFT_4", "amplitude": -12.0, "speed": 1.5, "axis": 'y'},
+]
+
