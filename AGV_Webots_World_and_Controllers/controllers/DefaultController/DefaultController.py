@@ -7,10 +7,11 @@ LOG_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "logs"))
 if LOG_DIR not in sys.path:
     sys.path.append(LOG_DIR)
 
-from config import RobotConfig, GOAL_POSITIONS
+from config import RobotConfig, GOAL_POSITIONS, DYNAMIC_OBSTACLES
 from core.state import State, Position
 from hardware.webots_interface import WebotsInterface
-from webots.moving_walls import MovingWalls
+# from webots.moving_walls import MovingWalls
+from webots.dynamic_environment import DynamicEnvironment
 from navigation.obstacle_avoidance import LidarObstacleAvoider
 from control.kinematics import KinematicsController
 from logger.robot_log import RobotLog 
@@ -32,8 +33,9 @@ class AGVSimulation:
         self.current_goal = Position(*GOAL_POSITIONS[self.goal_index])
         
         # Environment
-        self.moving_wall_1 = MovingWalls(self.hardware.timestep, self.hardware.robot, "_1")
-        self.moving_wall_2 = MovingWalls(self.hardware.timestep, self.hardware.robot, "_2")
+        self.environment = DynamicEnvironment(self.hardware.robot, DYNAMIC_OBSTACLES)
+        # self.moving_wall_1 = MovingWalls(self.hardware.timestep, self.hardware.robot, "_1")
+        # self.moving_wall_2 = MovingWalls(self.hardware.timestep, self.hardware.robot, "_2")
         
         # Timers
         self.last_print_time = 0.0
@@ -51,7 +53,7 @@ class AGVSimulation:
                 current_time = self.hardware.get_time()
                 
                 # --- 0. UPDATE ENVIRONMENT ---
-                self.__update_environment(current_time)
+                self.environment.update_all(current_time)
                 
                 # --- 1. PRINTING & DATABASE SAVING (Based on previous tick's data) ---
                 if self.__should_log(current_time):
@@ -112,10 +114,6 @@ class AGVSimulation:
         logger = RobotLog(log_file_path, controller_version="v1")
         logger.start(self.hardware.get_time())
         return logger
-    
-    def __update_environment(self, current_time):
-        self.moving_wall_1.move_wall(current_time, 3, 0.1, 'y')
-        self.moving_wall_2.move_wall(current_time, 5, 0.1, 'x')
 
     def __check_goal_reached(self, current_time):
         """Checks distance to goal and loads the next one if reached."""
