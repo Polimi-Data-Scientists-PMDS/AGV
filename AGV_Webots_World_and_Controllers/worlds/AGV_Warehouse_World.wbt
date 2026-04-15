@@ -1301,7 +1301,7 @@ Solid {
 ### Walls ###
 # Long Wall 1
 Solid {
-  translation 0 10.9 0.5
+  translation 0 10.9 2
   children [
     Shape {
         appearance DEF WALL_LOOK Appearance {
@@ -1310,7 +1310,7 @@ Solid {
             }
         }
         geometry DEF LONG_WALL_1 Box {
-            size 69 0.2 1
+            size 69 0.2 4
         }
     }
   ]
@@ -1320,12 +1320,12 @@ Solid {
 
 # Long Wall 2
 Solid {
-    translation -13.65 -10.9 0.5
+    translation -13.65 -10.9 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF LONG_WALL_2-1 Box {
-                size 41.75 0.2 1
+                size 41.75 0.2 4
             }
         }
     ]
@@ -1333,12 +1333,12 @@ Solid {
     boundingObject USE LONG_WALL_2-1
 }
 Solid {
-    translation 20.6 -2.8 0.5
+    translation 20.6 -2.8 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF LONG_WALL_2-2 Box {
-                size 27.6 0.2 1
+                size 27.6 0.2 4
             }
         }
     ]
@@ -1348,12 +1348,12 @@ Solid {
 
 # Short Wall 1
 Solid {
-    translation -34.4 0 0.5
+    translation -34.4 0 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF SHORT_WALL_1 Box {
-                size 0.2 21.94 1
+                size 0.2 21.94 4
             }
         }
     ]
@@ -1363,12 +1363,12 @@ Solid {
 
 # Short Wall 2
 Solid {
-    translation 34.4 4.1 0.5
+    translation 34.4 4.1 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF SHORT_WALL_2-1 Box {
-                size 0.2 13.8 1
+                size 0.2 13.8 4
             }
         }
     ]
@@ -1376,12 +1376,12 @@ Solid {
     boundingObject USE SHORT_WALL_2-1
 }
 Solid {
-    translation 7.3 -2.45 0.5
+    translation 7.3 -2.45 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF SHORT_WALL_2-2 Box {
-                size 0.2 17.1 1
+                size 0.2 17.1 4
             }
         }
     ]
@@ -1391,12 +1391,12 @@ Solid {
 
 # Internal Wall
 Solid {
-    translation -5.09814 -7.46193 0.5
+    translation -5.09814 -7.46193 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF INTERNAL_WALL Box {
-                size 0.5 7 1
+                size 0.5 7 4
             }
         }
     ]
@@ -1407,12 +1407,12 @@ Solid {
 ### Work Islands###
 # Work Island 01
 Solid {
-    translation -28.57 0 0.5
+    translation -28.57 0 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF ISLAND_01 Box {
-                size 0.5 14.71 1
+                size 0.5 14.71 4
             }
         }
     ]
@@ -1422,12 +1422,12 @@ Solid {
 
 # Work Island 1
 Solid {
-    translation -24.94 1.92 0.5
+    translation -24.94 1.92 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF ISLAND_1 Box {
-                size 1.2 3 1
+                size 1.2 3 4
             }
         }
     ]
@@ -1437,12 +1437,12 @@ Solid {
 
 # Work Island 2
 Solid {
-    translation -19.22 4 0.5
+    translation -19.22 4 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF ISLAND_2 Box {
-                size 1 5 1
+                size 1 5 4
             }
         }
     ]
@@ -1452,12 +1452,12 @@ Solid {
 
 # Work Island 3
 Solid {
-    translation -14.18 4 0.5
+    translation -14.18 4 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF ISLAND_3 Box {
-                size 1 5 1
+                size 1 5 4
             }
         }
     ]
@@ -1467,12 +1467,12 @@ Solid {
 
 # Work Island 4
 Solid {
-    translation -9.34 3.43 0.5
+    translation -9.34 3.43 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF ISLAND_4-1 Box {
-                size 1 2 1
+                size 1 2 4
             }
         }
     ]
@@ -1480,12 +1480,12 @@ Solid {
     boundingObject USE ISLAND_4-1
 }
 Solid {
-    translation -9.34 0.92 0.5
+    translation -9.34 0.92 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF ISLAND_4-2 Box {
-                size 3 4 1
+                size 3 4 4
             }
         }
     ]
@@ -1495,12 +1495,12 @@ Solid {
 
 # Work Island 5
 Solid {
-    translation -2.71 4 0.5
+    translation -2.71 4 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF ISLAND_5 Box {
-                size 1 4 1
+                size 1 4 4
             }
         }
     ]
@@ -1510,12 +1510,12 @@ Solid {
 
 # Work Island 6
 Solid {
-    translation 2.96 4 0.5
+    translation 2.96 4 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF ISLAND_6 Box {
-                size 1 4 1
+                size 1 4 4
             }
         }
     ]
@@ -1525,12 +1525,12 @@ Solid {
 
 # Work Island 7
 Solid {
-    translation 26.36 -0.1 0.5
+    translation 26.36 -0.1 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF ISLAND_7 Box {
-                size 12 3 1
+                size 12 3 4
             }
         }
     ]
@@ -1540,12 +1540,12 @@ Solid {
 
 # Work Island 8
 Solid {
-    translation 12.5 -1.08 0.5
+    translation 12.5 -1.08 2
     children [
         Shape {
             appearance USE WALL_LOOK
             geometry DEF ISLAND_8 Box {
-                size 6 2.5 1
+                size 6 2.5 4
             }
         }
     ]
@@ -1626,28 +1626,28 @@ DEF HUMAN_7 Pedestrian {
 
 # Forklift 1
 DEF FORKLIFT_1 Forklift {
-  translation -24.0 -4.5 0.81
+  translation -24.0 -4.5 0.75
   rotation 0 0 1 0
   name "forklift_1"
 }
 
 # Forklift 2
 DEF FORKLIFT_2 Forklift {
-  translation -31.0 9.0 0.81
+  translation -31.0 9.0 0.75
   rotation 0 0 1 0
   name "forklift_2"
 }
 
 # Forklift 3
 DEF FORKLIFT_3 Forklift {
-  translation -7.0 -8.0 0.81
+  translation -7.0 -8.0 0.75
   rotation 0 0 1 1.57
   name "forklift_3"
 }
 
 # Forklift 4
 DEF FORKLIFT_4 Forklift {
-  translation -27.0 6.0 0.81
+  translation -27.0 6.0 0.75
   rotation 0 0 1 -1.57
   name "forklift_4"
 }

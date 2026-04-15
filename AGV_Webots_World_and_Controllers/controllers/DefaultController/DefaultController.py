@@ -27,7 +27,7 @@ class AGVSimulation:
         self.kinematics = KinematicsController(self.config)
         self.avoider = LidarObstacleAvoider(self.config, self.logger, self.hardware.lidar.get_specs())
         if self.config.ENABLE_OBJECT_DETECTION:
-            self.vision = ObjectDetector()
+            self.vision = ObjectDetector(self.config)
         
         self.state = State(0, 0, 0)
         
