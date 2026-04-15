@@ -10,9 +10,9 @@ if LOG_DIR not in sys.path:
 from config import RobotConfig, GOAL_POSITIONS, DYNAMIC_OBSTACLES
 from core.state import State, Position
 from hardware.webots_interface import WebotsInterface
-# from webots.moving_walls import MovingWalls
 from webots.dynamic_environment import DynamicEnvironment
 from navigation.obstacle_avoidance import LidarObstacleAvoider
+from perception.vision import ObjectDetector 
 from control.kinematics import KinematicsController
 from logger.robot_log import RobotLog 
 
@@ -25,7 +25,10 @@ class AGVSimulation:
         
         # Modules
         self.kinematics = KinematicsController(self.config)
-        self.avoider = LidarObstacleAvoider(self.config, self.logger, self.hardware.get_lidar_specs())
+        self.avoider = LidarObstacleAvoider(self.config, self.logger, self.hardware.lidar.get_specs())
+        if self.config.ENABLE_OBJECT_DETECTION:
+            self.vision = ObjectDetector()
+        
         self.state = State(0, 0, 0)
         
         # Initial Goal
@@ -34,9 +37,7 @@ class AGVSimulation:
         
         # Environment
         self.environment = DynamicEnvironment(self.hardware.robot, DYNAMIC_OBSTACLES)
-        # self.moving_wall_1 = MovingWalls(self.hardware.timestep, self.hardware.robot, "_1")
-        # self.moving_wall_2 = MovingWalls(self.hardware.timestep, self.hardware.robot, "_2")
-        
+
         # Timers
         self.last_print_time = 0.0
         self.last_db_save = 0.0
@@ -68,19 +69,25 @@ class AGVSimulation:
                 
                 # --- 3. SENSE & UPDATE STATE ---
                 # wheels odometry
-                dL, dR = self.hardware.get_odometry()
+                dL, dR = self.hardware.motors.get_odometry()
                 dS, dTheta = self.kinematics.calculate_odometry(dL, dR)
                 self.state.update_with_odometry(dS, dTheta)
                 # gps odometry
-                gps_x, gps_y = self.hardware.get_gps()
+                gps_x, gps_y = self.hardware.gps.get_position()
                 self.state.fuse_with_gps(gps_x, gps_y)
                 
                 # --- 4. CALCULATE NEW ERRORS ---
                 dist_e, heading_e = self.state.calculate_errors(self.current_goal)
                 dist_e = min(self.config.CONTROL_VISION_DISTANCE, dist_e) # Cap distance
                 
-                # --- 5. OBSTACLE AVOIDANCE ---
-                pointcloud = self.hardware.read_lidar()
+                # --- 5. PERCEPTION (LIDAR & CAMERA) ---
+                pointcloud = self.hardware.lidar.read_scan()
+                # Extract image and run AI Object Detection
+                if self.config.ENABLE_OBJECT_DETECTION:
+                    camera_image = self.hardware.camera.get_image()
+                    detections = self.vision.process_and_display(camera_image, current_time)
+
+                # --- 6. OBSTACLE AVOIDANCE ---
                 safe_dist_e, safe_heading_e = self.avoider.obstacle_avoidance(pointcloud, dist_e, heading_e, current_time)
                 has_obstacle = len(self.avoider.used_obstacle_ids) > 0
                 
@@ -88,7 +95,7 @@ class AGVSimulation:
                 lin_vel, ang_vel = self.kinematics.calculate_velocity(safe_dist_e, safe_heading_e)
                 w_l, w_r = self.kinematics.get_wheel_velocities(lin_vel, ang_vel)
                 
-                self.hardware.apply_wheel_velocities(w_l, w_r)
+                self.hardware.motors.apply_velocities(w_l, w_r)
                 
                 # --- 7. PRINT  ---
                 if self.__should_print(current_time):
@@ -103,7 +110,7 @@ class AGVSimulation:
         finally:
             print("Controller stopped, saving log...")
             self.logger.log_event(self.hardware.get_time(), "STOP", "Controller stopped")
-            self.hardware.stop_motors()
+            self.hardware.motors.stop()
             self.logger.save()
             self.logger.save_to_database()
             print("Log saved to database successfully!")
@@ -139,8 +146,8 @@ class AGVSimulation:
         return current_time - self.last_print_time >= self.config.PRINT_INTERVAL_SEC
 
     def __print_data(self, current_time, dist_e, heading_e, lin_vel, ang_vel):
-        v_l_real, v_r_real = self.hardware.get_wheel_velocity()
-        gps_x, gps_y = self.hardware.get_gps()
+        v_l_real, v_r_real = self.hardware.motors.get_velocities()
+        gps_x, gps_y = self.hardware.gps.get_position()
         
         sensor_data = {
             "time": current_time,

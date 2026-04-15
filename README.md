@@ -6,17 +6,22 @@ Check [TODO.md](./TODO.md) for the list of tasks to be done.
 
 ## Installazione ambiente di sviluppo
 ### Come installare le dependencies:
+**Automaticamente (script):**  
+``` bash setup.sh ```  
+crea l'ambiente virtuale e scarica le dependencies (stampa il path da inserire in webots)
+
+oppure manualmente:
 - Installare il virtual enviorment 
-```  python3.14 -m venv .venv ```
+```  python3.12 -m venv .venv ```
 
 - Attivare il venv (unico dei tre comandi da fare sempre)
 ```source .venv/bin/activate```
 
-- Installare i requirements (*requirements.txt è stato aggiornato il 14/03/2026, se ci sono problemi con le dipendenze, controllare che sia aggiornato*)
+- Installare i requirements (*requirements.txt è stato aggiornato il 15/04/2026, se ci sono problemi con le dipendenze, controllare che sia aggiornato*)
 ```pip install -r requirements.txt```
 
 ### Come usare il venv in webots:
-1. Andare in `.venv > bin > python3.14` e fare tasto destro per copiare il percorso assoluto.
+1. Copiare il path restituito dallo script (oppure in `.venv > bin > python3.12` e fare tasto destro per copiare il percorso assoluto.)
 2. Su webots andare in: `Webots > preferences > Python commands` e incollare il nuovo percorso nel box apposito.
 
 ### Regole:

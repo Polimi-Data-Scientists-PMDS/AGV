@@ -1,6 +1,9 @@
 # config.py
 
 class RobotConfig:
+    # 0. FEATURES
+    ENABLE_OBJECT_DETECTION = False
+
     # 1. PHYSICAL ROBOT SPECS
     DISTANCE_BETWEEN_WHEELS = 0.33      # (m)
     WHEEL_RADIUS = 0.0975               # (m)

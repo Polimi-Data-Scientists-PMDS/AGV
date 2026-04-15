@@ -4,6 +4,10 @@ AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs_r
 AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs.jsonl
 AGV_Webots_World_and_Controllers/controllers/DefaultController/logs/*
 
+# ML Models
+*.pt
+
+# ----------------------------------------
 # MacOS garbage
 .DS_Store
 
