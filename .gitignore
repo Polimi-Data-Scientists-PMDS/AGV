@@ -4,6 +4,8 @@ AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs_r
 AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs.jsonl
 AGV_Webots_World_and_Controllers/controllers/DefaultController/logs/*
 
+# MacOS garbage
+.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
