@@ -24,13 +24,16 @@ class RobotConfig:
     COLLISION_DISTANCE = 0.2            # (m)
     NUM_SECTORS = 32
     PADDING = 3
+
+    YOLO_MODEL = "yolov8n.pt"
+    YOLO_THRESH = 0.4
     
     # 4. SIMULATION
     LOG_INTERVAL_SEC = 5.0
     PRINT_INTERVAL_SEC = 0.5
 
     # 5. VISUALIZATIONS 
-    PRINT_OBSTACLE_AVOIDANCE = True
+    PRINT_OBSTACLE_AVOIDANCE = False
 
 
 # List of targets
