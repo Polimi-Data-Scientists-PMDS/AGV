@@ -1,15 +1,39 @@
 # perception/vision.py
+import os
+os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+
 import cv2
 import numpy as np
 from ultralytics import YOLO
+import torch
+
+
 
 class ObjectDetector:
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
+
         print("Loading YOLOv8 AI Model (this might take a few seconds)...")
         # 'yolov8n.pt' is the "Nano" version. It is incredibly fast and lightweight.
         # Ultralytics will automatically download the file the first time you run this.
-        self.model = YOLO('yolov8n.pt') 
+        self.model = YOLO(self.config.YOLO_MODEL) 
         print("AI Model Loaded!")
+
+        # --- CROSS-PLATFORM HARDWARE ACCELERATION ---
+        # 1. Check for NVIDIA GPUs (Windows/Linux)
+        if torch.cuda.is_available():
+            self.device = 'cuda'
+            print("🚀 NVIDIA GPU (CUDA) Activated!")
+            
+        # 2. Check for Apple Silicon (M1/M2/M3 Macs)
+        elif torch.backends.mps.is_available():
+            self.device = 'mps'
+            print("🚀 Apple Silicon GPU (MPS) Activated!")
+            
+        # 3. Fallback to normal Processor (Older Macs or basic laptops)
+        else:
+            self.device = 'cpu'
+            print("⚠️ Running on CPU (Standard hardware)")
         
         self.last_process_time = 0.0
 
@@ -30,7 +54,10 @@ class ObjectDetector:
         # 1. Run YOLO Inference
         # conf=0.5 means it only highlights objects it is 50%+ confident about.
         # verbose=False stops it from spamming your terminal with detection logs.
-        results = self.model(image_array, conf=0.5, verbose=False)
+        results = self.model(image_array, 
+                             conf=self.config.YOLO_THRESH, 
+                             verbose=False, 
+                             device=self.device)
 
         # 2. Draw the bounding boxes automatically
         annotated_frame = results[0].plot()

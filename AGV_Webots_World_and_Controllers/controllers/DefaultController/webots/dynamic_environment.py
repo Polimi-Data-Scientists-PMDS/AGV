@@ -21,24 +21,23 @@ class DynamicObstacle:
         if not self.node:
             return
             
-        # MATH FIX: (1 - cos(t)) oscillates between 0 and 2. 
-        # By multiplying by (amplitude / 2), it perfectly oscillates between 0 and amplitude!
         offset = (self.amplitude / 2.0) * (1.0 - np.cos(self.calculated_frequency * t))
-        
-        current = self.position_field.getSFVec3f()
         
         if self.axis == 'x':
             self.position_field.setSFVec3f([
                 self.initial_position[0] + offset,
-                current[1],
-                current[2]
+                self.initial_position[1],
+                self.initial_position[2]  # Z is locked to the original spawn height!
             ])
         elif self.axis == 'y':
             self.position_field.setSFVec3f([
-                current[0],
+                self.initial_position[0],
                 self.initial_position[1] + offset,
-                current[2]
+                self.initial_position[2]  # Z is locked to the original spawn height!
             ])
+            
+        # Stops Webots from calculating wheel friction and joint forces while we are moving it.
+        self.node.resetPhysics()
 
 class DynamicEnvironment:
     """Master class that reads the config and holds all moving warehouse entities."""
