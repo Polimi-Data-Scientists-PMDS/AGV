@@ -54,10 +54,17 @@ class ObjectDetector:
         # 1. Run YOLO Inference
         # conf=0.5 means it only highlights objects it is 50%+ confident about.
         # verbose=False stops it from spamming your terminal with detection logs.
+        # show only categories of useful detections
+        # 0 = person, 7 = truck
         results = self.model(image_array, 
                              conf=self.config.YOLO_THRESH, 
                              verbose=False, 
-                             device=self.device)
+                             device=self.device,
+                             classes=[0, 7])
+
+        #rename the "truck" category to "forklift"
+        for r in results:
+            r.names[7] = "forklift"
 
         # 2. Draw the bounding boxes automatically
         annotated_frame = results[0].plot()
