@@ -76,20 +76,16 @@ class AGVSimulation:
                 gps_x, gps_y = self.hardware.gps.get_position()
                 self.state.fuse_with_gps(gps_x, gps_y)
                 
-                # --- 4. CALCULATE NEW ERRORS ---
-                dist_e, heading_e = self.state.calculate_errors(self.current_goal)
-                dist_e = min(self.config.CONTROL_VISION_DISTANCE, dist_e) # Cap distance
-                
-                # --- 5. PERCEPTION (LIDAR & CAMERA) ---
+                # --- 4. PERCEPTION (LIDAR & CAMERA) ---
                 pointcloud = self.hardware.lidar.read_scan()
                 # Extract image and run AI Object Detection
                 if self.config.ENABLE_OBJECT_DETECTION:
                     camera_image = self.hardware.camera.get_image()
                     detections = self.vision.process_and_display(camera_image, current_time)
 
-                # --- 6. OBSTACLE AVOIDANCE ---
-                safe_dist_e, safe_heading_e = self.avoider.obstacle_avoidance(pointcloud, dist_e, heading_e, current_time)
-                has_obstacle = len(self.avoider.used_obstacle_ids) > 0
+                # --- 5. OBSTACLE AVOIDANCE ---
+                safe_dist_e, safe_heading_e = self.avoider.obstacle_avoidance(pointcloud, self.state, self.current_goal, current_time)
+                has_obstacle = len(self.avoider.used_obstacle_ids) > 0 
                 
                 # --- 6. ACT (KINEMATICS) ---
                 lin_vel, ang_vel = self.kinematics.calculate_velocity(safe_dist_e, safe_heading_e)

@@ -15,7 +15,11 @@ class LidarObstacleAvoider:
         self.locked_space = None
         self.is_escaping_dead_end = False
 
-    def obstacle_avoidance(self, pointcloud, dist_e, heading_e, current_time):
+    def obstacle_avoidance(self, pointcloud, current_state, goal, current_time):
+        # CALCULATE CONTROL ERRORS
+        dist_e, heading_e = current_state.calculate_errors(goal)
+        dist_e = min(self.config.CONTROL_VISION_DISTANCE, dist_e) # Cap distance
+
         # --- 0. COLLISION DETECTION ---
         if pointcloud and min(x[1] for x in pointcloud) < self.config.COLLISION_DISTANCE:
             print(f"COLLISION DETECTED")
