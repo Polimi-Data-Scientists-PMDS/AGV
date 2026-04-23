@@ -16,6 +16,11 @@ class RobotLog:
         with open(self.realtime_log_file_path, "w", encoding="utf-8") as f:
             pass
 
+        # Ensure the realtime panel file exists before the first START event is logged.
+        # It is read by log_event() even before the first sensor frame is available.
+        with open(self.realtime_panel, "w", encoding="utf-8") as f:
+            f.write("{}\n")
+
         self.controller_version = controller_version
         self.start_time = None
         self.last_time = None
@@ -96,30 +101,31 @@ class RobotLog:
     def log_event(self, sim_time, event_type, details):
         self.events.append((self.sim_id, sim_time, event_type, details))
         self.event_count += 1
-        with open(self.realtime_panel, "r", encoding="utf-8") as f:
-            try:
+        try:
+            with open(self.realtime_panel, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                x = (
-                    self.sim_id,
-                    sim_time,
-                    event_type,
-                    data.get("state", {}).get("x", 0.0),
-                    data.get("state", {}).get("y", 0.0),
-                    data.get("state", {}).get("theta", 0.0),
-                    data.get("gps", {}).get("x", 0.0),
-                    data.get("gps", {}).get("y", 0.0),
-                    data.get("gps_diff", {}).get("dx", 0.0),
-                    data.get("gps_diff", {}).get("dy", 0.0),
-                    data.get("errors", {}).get("distance", 0.0),
-                    data.get("errors", {}).get("heading", 0.0),
-                    data.get("wheel_velocities", {}).get("left", 0.0),
-                    data.get("wheel_velocities", {}).get("right", 0.0),
-                    data.get("robot_velocities", {}).get("linear", 0.0),
-                    data.get("robot_velocities", {}).get("angular", 0.0),
-                )
-            except json.JSONDecodeError:
-                print(f"Warning: Failed to decode JSON from realtime log for event telemetry at sim_time={sim_time}. Logging with default values.")
-                x = (self.sim_id, sim_time, event_type, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, -1.0, 0.0, 0.0, 0.0, 0.0)
+        except (FileNotFoundError, json.JSONDecodeError):
+            print(f"Warning: Realtime panel unavailable/corrupt at sim_time={sim_time}. Logging event telemetry with default values.")
+            data = {}
+
+        x = (
+            self.sim_id,
+            sim_time,
+            event_type,
+            data.get("state", {}).get("x", 0.0),
+            data.get("state", {}).get("y", 0.0),
+            data.get("state", {}).get("theta", 0.0),
+            data.get("gps", {}).get("x", 0.0),
+            data.get("gps", {}).get("y", 0.0),
+            data.get("gps_diff", {}).get("dx", 0.0),
+            data.get("gps_diff", {}).get("dy", 0.0),
+            data.get("errors", {}).get("distance", 0.0),
+            data.get("errors", {}).get("heading", 0.0),
+            data.get("wheel_velocities", {}).get("left", 0.0),
+            data.get("wheel_velocities", {}).get("right", 0.0),
+            data.get("robot_velocities", {}).get("linear", 0.0),
+            data.get("robot_velocities", {}).get("angular", 0.0),
+        )
     
         self.event_telemetry.append(x)
         
