@@ -26,14 +26,12 @@ CREATE TABLE EventTelemetry (
   state_theta DOUBLE NOT NULL,
   gps_x DOUBLE NOT NULL,
   gps_y DOUBLE NOT NULL,
-  gps_dx DOUBLE NOT NULL,
-  gps_dy DOUBLE NOT NULL,
   error_distance DOUBLE NOT NULL,
   error_heading DOUBLE NOT NULL,
-  wheel_vel_left DOUBLE NOT NULL,
-  wheel_vel_right DOUBLE NOT NULL,
-  robot_vel_linear DOUBLE NOT NULL,
-  robot_vel_angular DOUBLE NOT NULL,
+  current_vel_linear DOUBLE NOT NULL,
+  current_vel_angular DOUBLE NOT NULL,
+  target_vel_linear DOUBLE NOT NULL,
+  target_vel_angular DOUBLE NOT NULL,
   FOREIGN KEY (sim_id) REFERENCES Simulations(id),
   FOREIGN KEY (sim_id, event_time, e_type) REFERENCES Events(sim_id, sim_time, e_type)
 );

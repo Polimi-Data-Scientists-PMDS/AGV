@@ -23,8 +23,7 @@ class Perception:
         if self.vision_config.enable_object_detection:
             self.object_detection = ObjectDetector()
 
-    def perceive(self) -> SensorData:
-        current_time = self.hardware.get_time()
+    def perceive(self, current_time) -> SensorData:
         data = SensorData(current_time)
 
         data.dt =  self.__get_dt(current_time)
