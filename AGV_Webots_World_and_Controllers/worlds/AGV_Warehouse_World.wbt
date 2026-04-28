@@ -41,11 +41,11 @@ DEF PIONEER_3 Robot {
     GPS {
     }
     Lidar {
-      translation 0 0 0.5
+      translation 0 0 0.8
       name "Lidar1"
       horizontalResolution 360
-      fieldOfView 3.14
-      maxRange 2
+      fieldOfView 6.28 
+      maxRange 25.0
     }
 
 
@@ -55,7 +55,7 @@ DEF PIONEER_3 Robot {
       height 480
       fieldOfView 1.5
       rotation 0 1 0 0
-      translation 0 0 0.8
+      translation 0 0 1.2
     }
   
 

@@ -7,16 +7,17 @@ import numpy as np
 from ultralytics import YOLO
 import torch
 
+from config import VisionConfig
 
 
 class ObjectDetector:
-    def __init__(self, config):
-        self.config = config
+    def __init__(self):
+        self.config = VisionConfig()
 
         print("Loading YOLOv8 AI Model (this might take a few seconds)...")
         # 'yolov8n.pt' is the "Nano" version. It is incredibly fast and lightweight.
         # Ultralytics will automatically download the file the first time you run this.
-        self.model = YOLO(self.config.YOLO_MODEL) 
+        self.model = YOLO(self.config.yolo_model) 
         print("AI Model Loaded!")
 
         # --- CROSS-PLATFORM HARDWARE ACCELERATION ---
@@ -37,9 +38,9 @@ class ObjectDetector:
         
         self.last_process_time = 0.0
 
-    def process_and_display(self, image_array, current_time):
+    def detect(self, image, current_time):
         """Runs AI inference and displays the camera feed."""
-        if image_array is None:
+        if image is None:
             return None
 
         # PERFORMANCE THROTTLE:
@@ -52,12 +53,9 @@ class ObjectDetector:
         self.last_process_time = current_time
 
         # 1. Run YOLO Inference
-        # conf=0.5 means it only highlights objects it is 50%+ confident about.
-        # verbose=False stops it from spamming your terminal with detection logs.
-        # show only categories of useful detections
         # 0 = person, 7 = truck
-        results = self.model(image_array, 
-                             conf=self.config.YOLO_THRESH, 
+        results = self.model(image, 
+                             conf=self.config.yolo_thresh, 
                              verbose=False, 
                              device=self.device,
                              classes=[0, 7])
