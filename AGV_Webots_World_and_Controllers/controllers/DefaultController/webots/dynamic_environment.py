@@ -1,6 +1,8 @@
 # webots/DynamicEnvironment.py
 import numpy as np
 
+from config import WorldConfig
+
 class DynamicObstacle:
     """Helper class to manage a single moving entity."""
     def __init__(self, node, amplitude, speed, axis):
@@ -41,11 +43,12 @@ class DynamicObstacle:
 
 class DynamicEnvironment:
     """Master class that reads the config and holds all moving warehouse entities."""
-    def __init__(self, robot, obstacle_configs):
+    def __init__(self, robot):
+        self.config = WorldConfig()
         self.robot = robot
         self.obstacles = []
         
-        for config in obstacle_configs:
+        for config in self.config.dynamic_obstacles:
             node = self.robot.getFromDef(config["def_name"])
             if node:
                 self.obstacles.append(
