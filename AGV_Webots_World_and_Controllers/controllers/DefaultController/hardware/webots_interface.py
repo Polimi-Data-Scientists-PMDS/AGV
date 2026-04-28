@@ -1,20 +1,20 @@
 # hardware/webots_interface.py
 from controller import Supervisor # type: ignore
 
+from hardware.hardware_interface import HardwareInterface
 from hardware.motors import Motors
 from hardware.lidar import Lidar
 from hardware.gps import GPS
 from hardware.camera import Camera
     
-
-class WebotsInterface:
-    def __init__(self, config):
-        self.config = config
+class WebotsInterface(HardwareInterface):
+    def __init__(self):
+        super().__init__()
         self.robot = Supervisor()
         self.timestep = int(self.robot.getBasicTimeStep())
         
         # initialize components
-        self.motors = Motors(self.robot, self.timestep, self.config)
+        self.motors = Motors(self.robot, self.timestep)
         self.lidar = Lidar(self.robot, self.timestep)
         self.gps = GPS(self.robot, self.timestep)
         self.camera = Camera(self.robot, self.timestep)
