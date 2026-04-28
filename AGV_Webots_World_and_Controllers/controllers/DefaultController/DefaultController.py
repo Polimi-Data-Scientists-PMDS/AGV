@@ -77,7 +77,7 @@ class AGVSimulation:
                 
                 # ---------------------------------------------------------------
                 # --- 1. PERCEPTION ---
-                sensor_data: SensorData = self.perception.perceive()
+                sensor_data: SensorData = self.perception.perceive(current_time)
 
                 # --- 2. LOCALIZATION ---
                 state: RobotState = self.localization.localize(prev_state, sensor_data)
@@ -100,9 +100,8 @@ class AGVSimulation:
                     self.__print_data(current_time, sensor_data, state, goal, path, command)
                     self.last_print_time = current_time
                 # --- LOG UPDATE  ---
-                # obstacle_msg = f"obstacle(s) found at x={gps_x:.2f}; y={gps_y:.2f}" if has_obstacle else f"obstacle cleared at x={gps_x:.2f}; y={gps_y:.2f}"
-                # self.logger.update_obstacle_state(current_time, has_obstacle, obstacle_msg)
-                # self.logger.update(current_time, lin_vel, ang_vel)
+                self.logger.update_obstacle_state(current_time, path.has_obstacle, sensor_data)
+                self.logger.update_idle_state(current_time, state)
                 
 
 
@@ -153,16 +152,7 @@ class AGVSimulation:
         v_l_real, v_r_real = self.hardware.motors.get_velocities()
         gps_x, gps_y = self.hardware.gps.get_position()
         
-        # sensor_data = {
-        #     "time": current_time,
-        #     "state": {"x": state.x, "y": state.y, "theta": state.theta},
-        #     "gps": {"x": gps_x, "y": gps_y},
-        #     "errors": {"distance": dist_e, "heading": heading_e},
-        #     "wheel_velocities": {"left": v_l_real, "right": v_r_real},
-        #     "robot_velocities": {"linear": lin_vel, "angular": ang_vel},
-        #     "goal_position": {"x": self.current_goal.x, "y": self.current_goal.y}
-        # }
-        # self.logger.log_realtime(sensor_data)
+        self.logger.log_realtime(sensor_data, state, goal, command)
         
         print("="*40)
         # status = "GOAL REACHED!" if dist_e < self.config.GOAL_REACHED_THRESH else "MOVING..."
@@ -182,31 +172,6 @@ class AGVSimulation:
 
         # print(f"\nRobot velocities:\n  Linear : {lin_vel:.2f} m/s\n  Angular: {ang_vel:.2f} rad/s")
         print("="*40)
-
-    # def __print_data(self, current_time, dist_e, heading_e, lin_vel, ang_vel):
-    #     v_l_real, v_r_real = self.hardware.motors.get_velocities()
-    #     gps_x, gps_y = self.hardware.gps.get_position()
-        
-    #     sensor_data = {
-    #         "time": current_time,
-    #         "state": {"x": self.state.x, "y": self.state.y, "theta": self.state.theta},
-    #         "gps": {"x": gps_x, "y": gps_y},
-    #         "errors": {"distance": dist_e, "heading": heading_e},
-    #         "wheel_velocities": {"left": v_l_real, "right": v_r_real},
-    #         "robot_velocities": {"linear": lin_vel, "angular": ang_vel},
-    #         "goal_position": {"x": self.current_goal.x, "y": self.current_goal.y}
-    #     }
-    #     self.logger.log_realtime(sensor_data)
-        
-    #     print("="*40)
-    #     status = "GOAL REACHED!" if dist_e < self.config.GOAL_REACHED_THRESH else "MOVING..."
-    #     print(f"Status: {status}")
-    #     print(f"Time: {current_time:.2f}s")
-    #     print(f"\nGoal:\n  x: {self.current_goal.x:.1f} m\n  y: {self.current_goal.y:.1f} m")
-    #     print(f"\nState:\n  x: {self.state.x:.2f} m\n  y: {self.state.y:.2f} m\n  th: {self.state.theta:.2f} rad")
-    #     print(f"\nControl errors:\n  Distance: {dist_e:.1f} m\n  Heading: {heading_e:.2f} rad")
-    #     print(f"\nRobot velocities:\n  Linear : {lin_vel:.2f} m/s\n  Angular: {ang_vel:.2f} rad/s")
-    #     print("="*40)
 
 
 if __name__ == "__main__":

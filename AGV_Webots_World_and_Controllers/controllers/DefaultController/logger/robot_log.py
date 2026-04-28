@@ -98,6 +98,22 @@ class RobotLog:
         self.last_time = sim_time
         self.log_event(sim_time, "START", "Controller started")
 
+    def log_realtime(self, sensor_data, state, goal, command):
+        data = {
+            "time": sensor_data.time,
+            "state": {"x": state.x, "y": state.y, "theta": state.theta},
+            "gps": {"x": sensor_data.gps[0], "y": sensor_data.gps[1]},
+            "errors": {"distance": command.rho, "heading": command.alpha},
+            "current_velocities": {"linear": state.v, "angular": state.omega},
+            "target_velocities": {"linear": command.v, "angular": command.omega},
+            "goal_position": {"x": goal.x, "y": goal.y}
+        }
+
+        with open(self.realtime_log_file_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(data) + "\n")
+        with open(self.realtime_panel, "w", encoding="utf-8") as f:
+            f.write(json.dumps(data) + "\n")
+    
     def log_event(self, sim_time, event_type, details):
         self.events.append((self.sim_id, sim_time, event_type, details))
         self.event_count += 1
@@ -117,14 +133,12 @@ class RobotLog:
             data.get("state", {}).get("theta", 0.0),
             data.get("gps", {}).get("x", 0.0),
             data.get("gps", {}).get("y", 0.0),
-            data.get("gps_diff", {}).get("dx", 0.0),
-            data.get("gps_diff", {}).get("dy", 0.0),
             data.get("errors", {}).get("distance", 0.0),
             data.get("errors", {}).get("heading", 0.0),
-            data.get("wheel_velocities", {}).get("left", 0.0),
-            data.get("wheel_velocities", {}).get("right", 0.0),
-            data.get("robot_velocities", {}).get("linear", 0.0),
-            data.get("robot_velocities", {}).get("angular", 0.0),
+            data.get("current_velocities", {}).get("linear", 0.0),
+            data.get("current_velocities", {}).get("angular", 0.0),
+            data.get("target_velocities", {}).get("linear", 0.0),
+            data.get("target_velocities", {}).get("angular", 0.0),
         )
     
         self.event_telemetry.append(x)
@@ -140,45 +154,39 @@ class RobotLog:
     def log_unexpected_behavior(self, sim_time, description):
         self.log_event(sim_time, "UNEXPECTED_BEHAVIOR", description)
 
-    def update(self, sim_time, linear_speed, angular_speed, idle_speed_threshold=1e-3):
+    def update_obstacle_state(self, sim_time, has_obstacle, sensor_data):
+        gps_x = sensor_data.gps[0]
+        gps_y = sensor_data.gps[1]
+        obstacle_msg = f"obstacle(s) found at x={gps_x:.2f}; y={gps_y:.2f}" if has_obstacle else f"obstacle cleared at x={gps_x:.2f}; y={gps_y:.2f}"
+        if has_obstacle and not self.in_obstacle_state:
+            self.obstacle_count += 1
+            self.log_event(sim_time, "OBSTACLE_ENCOUNTER", obstacle_msg)
+        elif not has_obstacle and self.in_obstacle_state:
+            self.log_event(sim_time, "OBSTACLE_CLEARED", obstacle_msg)
+
+        self.in_obstacle_state = has_obstacle
+
+    def update_idle_state(self, current_time, state, idle_speed_threshold=1e-3):
         if self.start_time is None:   
-            self.start(sim_time)
+            self.start(current_time)
             return
-
-        if self.last_time is None:
-            self.last_time = sim_time
-
-        delta_t = max(0.0, sim_time - self.last_time)
-        self.total_time = max(0.0, sim_time - self.start_time)
         
-        currently_idle = abs(linear_speed) <= idle_speed_threshold 
-        #! if abs(linear_speed) <= idle_speed_threshold then currently_idle is True, else False
+        if self.last_time is None:
+            self.last_time = current_time
+
+        delta_t = max(0.0, current_time - self.last_time)
+        self.total_time = max(0.0, current_time - self.start_time)
+
+        currently_idle = abs(state.v) <= idle_speed_threshold
         if currently_idle:
             self.idle_time += delta_t
 
         if currently_idle != self.is_idle:
             if currently_idle:
-                self.log_event(sim_time, "IDLE_START", f"linear_speed={linear_speed:.6f}, anglular_speed={angular_speed:.2f}")
+                self.log_event(current_time, "IDLE_START", f"linear_speed={state.v:.6f}, angular_speed={state.omega:.2f}")
             else:
-                self.log_event(sim_time, "IDLE_END", f"linear_speed={linear_speed:.6f}, anglular_speed={angular_speed:.2f}")
+                self.log_event(current_time, "IDLE_END", f"linear_speed={state.v:.6f}, angular_speed={state.omega:.2f}")
             self.is_idle = currently_idle
-
-        self.last_time = sim_time
-
-    def update_obstacle_state(self, sim_time, has_obstacle, details=""):
-        if has_obstacle and not self.in_obstacle_state:
-            self.obstacle_count += 1
-            self.log_event(sim_time, "OBSTACLE_ENCOUNTER", details)
-        elif not has_obstacle and self.in_obstacle_state:
-            self.log_event(sim_time, "OBSTACLE_CLEARED", details)
-
-        self.in_obstacle_state = has_obstacle
-
-    def log_realtime(self, sensor_data):
-        with open(self.realtime_log_file_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(sensor_data) + "\n")
-        with open(self.realtime_panel, "w", encoding="utf-8") as f:
-            f.write(json.dumps(sensor_data) + "\n")
 
     # TODO: remove this method after datbase integration is verified working, as we will be saving directly to the database instead of a JSONL file
     def save(self):
@@ -235,8 +243,9 @@ class RobotLog:
             insert_query_events_telemetry = """
                 INSERT INTO EventTelemetry (
                     sim_id, event_time, e_type, state_x, state_y, state_theta,
-                    gps_x, gps_y, gps_dx, gps_dy, error_distance, error_heading,
-                    wheel_vel_left, wheel_vel_right, robot_vel_linear, robot_vel_angular
+                    gps_x, gps_y, error_distance, error_heading,
+                    current_vel_linear, current_vel_angular,
+                    target_vel_linear, target_vel_angular
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
 
@@ -255,14 +264,12 @@ class RobotLog:
                     state_theta,
                     gps_x,
                     gps_y,
-                    gps_dx,
-                    gps_dy,
                     error_distance,
                     error_heading,
-                    wheel_vel_left,
-                    wheel_vel_right,
-                    robot_vel_linear,
-                    robot_vel_angular,
+                    current_vel_linear,
+                    current_vel_angular,
+                    target_vel_linear,
+                    target_vel_angular
                 )
                 for (
                     sim_id,
@@ -273,15 +280,14 @@ class RobotLog:
                     state_theta,
                     gps_x,
                     gps_y,
-                    gps_dx,
-                    gps_dy,
                     error_distance,
                     error_heading,
-                    wheel_vel_left,
-                    wheel_vel_right,
-                    robot_vel_linear,
-                    robot_vel_angular,
-                ) in self.event_telemetry
+                    current_vel_linear,
+                    current_vel_angular,
+                    target_vel_linear,
+                    target_vel_angular
+                )
+                in self.event_telemetry
             ]
 
             cursor.execute(update_query_simulations, (
