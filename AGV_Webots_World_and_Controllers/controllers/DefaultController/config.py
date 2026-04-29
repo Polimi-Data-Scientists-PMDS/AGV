@@ -63,7 +63,7 @@ class PerceptionConfig:
 
 @dataclass(frozen=True)
 class VisionConfig:
-    enable_object_detection = False
+    enable_object_detection = True
     yolo_model = "yolov8n.pt"
     yolo_thresh = 0.4
     
