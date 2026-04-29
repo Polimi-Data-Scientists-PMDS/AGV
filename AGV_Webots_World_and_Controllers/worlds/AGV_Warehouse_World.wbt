@@ -1137,33 +1137,6 @@ DEF PIONEER_3 Robot {
   controller "DefaultController"
 }
 
-### Moving parts ###
-# Moving wall 1
-#DEF MOVING_WALL_1 Solid {
-#  name "MOVING_WALL_1"
-#  translation -7 0.5 1
-#  children [
-#    Shape {
-#      geometry Box { size 1 1 2 }
-#    }
-#  ]
-#  boundingObject Box { size 1 1 2 }
-#  physics NULL
-#}
-
-# Moving wall 2
-#DEF MOVING_WALL_2 Solid {
-#  name "MOVING_WALL_2"
-#  translation -7 8 1
-#  children [
-#    Shape {
-#      geometry Box { size 1 1 2 }
-#    }
-#  ]
-#  boundingObject Box { size 1 1 2 }
-#  physics NULL
-#}
-
 ### Dropoff ###
 # Dropoff 01
 Solid {
@@ -1553,7 +1526,7 @@ Solid {
     boundingObject USE ISLAND_8
 }
 
-
+### Moving parts ###
 # Worker 1
 DEF HUMAN_1 Pedestrian {
   translation -16.0 6.0 1.27

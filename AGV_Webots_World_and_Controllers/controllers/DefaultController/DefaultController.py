@@ -94,7 +94,9 @@ class AGVSimulation:
                     self.__print_and_log_data(current_time, sensor_data, state, goal, path, command)
                     self.last_print_time = current_time
                 # --- UPDATE LOGGGER STATE  ---
-                self.logger.update_obstacle_state(current_time, path.has_obstacle, sensor_data)
+                # TODO: add `has_obstacle` to the path object
+                # self.logger.update_obstacle_state(current_time, path.has_obstacle, sensor_data)
+                self.logger.update_obstacle_state(current_time, False, sensor_data)
                 self.logger.update_idle_state(current_time, state)
                 # --- UPDATE DATABASE ---
                 if self.__should_save_to_database(current_time):

@@ -71,5 +71,10 @@ class ObjectDetector:
         cv2.imshow("AGV AI Camera", annotated_frame)
         cv2.waitKey(1) 
         
+        # Save the frame to disk so the Streamlit dashboard can access it
+        log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "logs"))
+        os.makedirs(log_dir, exist_ok=True)
+        cv2.imwrite(os.path.join(log_dir, "camera_feed.jpg"), annotated_frame)
+        
         # Return the raw detection data in case the robot needs to react to it later!
         return results[0].boxes
