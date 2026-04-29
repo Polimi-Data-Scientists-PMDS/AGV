@@ -29,9 +29,6 @@ class RobotLog:
         self.obstacle_count = 0
         self.event_count = 0
         self.events = []
-        # self.events = [(1.0, "START", "Controller started"), (2.5, "IDLE_START", "linear_speed=0.000"), 
-        # (4.0, "IDLE_END", "linear_speed=0.500"), (5.0, "OBSTACLE_ENCOUNTER", "L=0.100, C=0.050, R=0.200"), 
-        # (6.5, "OBSTACLE_CLEARED", "L=0.300, C=0.400, R=0.350"), (10.0, "STOP", "Controller stopped")]
         self.event_telemetry = []
         self.is_idle = False
         self.in_obstacle_state = False
@@ -195,7 +192,7 @@ class RobotLog:
             os.makedirs(log_dir, exist_ok=True)
 
         for sim_id, sim_time, event_type, details in self.events:
-            run_payload = {
+            events_dict = {
                 "controller_version": self.controller_version,
                 "obstacle_count": self.obstacle_count,
                 "event": [
@@ -208,12 +205,12 @@ class RobotLog:
                 ],
             }
             with open(self.log_file_path, "a", encoding="utf-8") as log_file:
-                log_file.write(json.dumps(run_payload) + "\n")
+                log_file.write(json.dumps(events_dict) + "\n")
 
     def save_to_database(self):
         """
-        Reads the robot_controller_runs JSONL file and inserts it into MySQL 
-        in a single robust batch operation.
+        Updates the simulation summary and batch-saves in-memory events
+        and event telemetry records to MySQL.
         """
 
         conn = None
@@ -240,52 +237,38 @@ class RobotLog:
                 ) VALUES (%s, %s, %s, %s)
             """
 
-            insert_query_events_telemetry = """
-                INSERT INTO EventTelemetry (
-                    sim_id, event_time, e_type, state_x, state_y, state_theta,
-                    gps_x, gps_y, error_distance, error_heading,
-                    current_vel_linear, current_vel_angular,
-                    target_vel_linear, target_vel_angular
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-
             db_events = [
                 (sim_id, self._seconds_to_mysql_time(sim_time), event_type, details)
                 for sim_id, sim_time, event_type, details in self.events
             ]
 
+            insert_query_events_telemetry = """
+                INSERT INTO EventTelemetry (
+                    sim_id, event_time, e_type, 
+                    state_x, state_y, state_theta,
+                    gps_x, gps_y, 
+                    error_distance, error_heading,
+                    current_vel_linear, current_vel_angular,
+                    target_vel_linear, target_vel_angular
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+
             db_event_telemetry = [
                 (
-                    sim_id,
-                    self._seconds_to_mysql_time(event_time),
-                    event_type,
-                    state_x,
-                    state_y,
-                    state_theta,
-                    gps_x,
-                    gps_y,
-                    error_distance,
-                    error_heading,
-                    current_vel_linear,
-                    current_vel_angular,
-                    target_vel_linear,
-                    target_vel_angular
+                    sim_id, self._seconds_to_mysql_time(event_time), event_type,
+                    state_x, state_y, state_theta,
+                    gps_x, gps_y,
+                    error_distance, error_heading,
+                    current_vel_linear, current_vel_angular,
+                    target_vel_linear, target_vel_angular
                 )
                 for (
-                    sim_id,
-                    event_time,
-                    event_type,
-                    state_x,
-                    state_y,
-                    state_theta,
-                    gps_x,
-                    gps_y,
-                    error_distance,
-                    error_heading,
-                    current_vel_linear,
-                    current_vel_angular,
-                    target_vel_linear,
-                    target_vel_angular
+                    sim_id, event_time, event_type,
+                    state_x, state_y, state_theta,
+                    gps_x, gps_y,
+                    error_distance, error_heading,
+                    current_vel_linear, current_vel_angular,
+                    target_vel_linear,target_vel_angular
                 )
                 in self.event_telemetry
             ]
