@@ -338,3 +338,9 @@ class LocalGridVisualizer:
 
         cv2.imshow(self.window_name, display_image)
         cv2.waitKey(1)
+
+        # Save the grid image to disk so the Streamlit dashboard can access it
+        import os
+        log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "logs"))
+        os.makedirs(log_dir, exist_ok=True)
+        cv2.imwrite(os.path.join(log_dir, "local_planner_grid.jpg"), display_image)
