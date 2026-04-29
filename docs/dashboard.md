@@ -9,17 +9,19 @@ The interface provides continuous updates to:
 - GPS sensor readings.
 - Tracking metrics including distance and heading errors relative to the current goal.
 - Current and target (commanded) velocities (linear and angular).
-- A 2D live map plotting the robot's current position, orientation, and its relative location to known waypoints (Pickup/Dropoff/Charging stations) and the current goal.
+- A 2D live map plotting the robot's current position, orientation, fixed static obstacles (Work Islands and Walls), and its relative location to known waypoints, properly scaled to the warehouse's 69x22 meter dimensions.
+- **Live Local Planner Grid**: A real-time video feed displaying the navigation logic matrix.
+- **Robot AI Camera**: A real-time video feed displaying the YOLO-based object detection output from the robot's onboard camera.
 
 ### Why I did it
 - **Why Streamlit:** Streamlit is highly optimized for Python data applications. It allows us to rapidly prototype user interfaces directly from our Python scripts without needing to build a complex frontend in JavaScript or setting up complicated API endpoints for real-time WebSockets.
-- **Data Source Decision:** Instead of directly querying the MySQL database continuously—which could introduce latency and load—the dashboard reads from the localized `robot_controller_runs_realtime_panel.jsonl` file. This file is consistently overwritten by the controller with the absolute latest state variables (a single JSON object), ensuring $O(1)$ read complexity with minimal overhead.
+- **Data Source Decision:** Instead of directly querying the MySQL database continuously—which could introduce latency and load—the dashboard reads from the localized `robot_controller_runs_realtime_panel.jsonl` file. It also reads individual JPEG image streams directly from the `logs` folder. These files are consistently overwritten by the controller with the absolute latest state variables, ensuring $O(1)$ read complexity with minimal overhead.
 
 ### Workflow
-1. The Webots Python controller captures the simulation state and dumps the latest telemetry frame to `logs/robot_controller_runs_realtime_panel.jsonl` every cycle.
-2. The Streamlit application (`dashboard/app.py`) reads this file every 0.5 seconds (customizable).
-3. Using `matplotlib`, the dashboard recalculates and draws the robot's coordinates on a grid against predefined fixed waypoints defined in the project's parameters.
-4. Streamlit calls `st.rerun()` dynamically to auto-refresh the browser interface, presenting a smooth live feed of the metrics.
+1. The Webots Python controller captures the simulation state and dumps the latest telemetry frame and image streams (`camera_feed.jpg` & `local_planner_grid.jpg`) to the `logs/` directory every cycle.
+2. The Streamlit application (`dashboard/app.py`) reads these files at a customizable FPS.
+3. Using `matplotlib`, the dashboard recalculates and draws the robot's coordinates on a static warehouse grid.
+4. Streamlit avoids full-page flickering by utilizing an infinite `while True` loop that targets and updates specific UI components (`st.empty()`) in-place, creating a seamless, true video-feed experience.
 
 ---
 
@@ -46,6 +48,6 @@ streamlit run dashboard/app.py
 
 ### Expected Behavior
 1. Streamlit will launch a local web server (usually at `http://localhost:8501`) and automatically open it in your default web browser.
-2. If the AGV simulation **is currently running** in Webots, the metrics and the map will update in real-time.
+2. If the AGV simulation **is currently running** in Webots, the metrics, map, and visualizers will update in real-time.
 3. If the simulation is **stopped**, the dashboard will display the very last known state of the robot before the simulation ended.
-4. You can use the left sidebar to toggle the `Auto-Refresh` functionality or adjust the `Refresh Rate` to match your performance needs.
+4. You can use the left sidebar to adjust the `Refresh Rate (FPS)` slider to match your desired frame rate dynamically.
