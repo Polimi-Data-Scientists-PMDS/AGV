@@ -79,6 +79,7 @@ Copiare ed incollare le diferse query per creare le tabelle che si trovano all'i
 Se tutto è andato a buon fine, vedrai il messaggio `Query OK`. Puoi uscire digitando `EXIT;`.
 
 > ricordarsi di installare il nuovo pacchetto di python chiamato `mysql-connector-python`.
+> ricordarsi di controllare sempre il file `Database_Structure.sql` per eventuali aggiornamenti alla struttura del database, e di eseguire le query per modificare il db se ci sono modifiche
 ---
 
 ### Gestione del Container: Uscire, Fermare e Riavviare
