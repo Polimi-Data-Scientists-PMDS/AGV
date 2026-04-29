@@ -1,113 +1,146 @@
-# AGV
-PMDS x DevNut Autonomous Guided Vehicle project
+# Autonomous Guided Vehicle (AGV)
+**PMDS x DevNut Autonomous Guided Vehicle Project**
 
-## TODOS
-Check [TODO.md](./TODO.md) for the list of tasks to be done.
+## Table of Contents
+- [TODOs](#todos)
+- [Development Environment Setup](#development-environment-setup)
+- [Webots Configuration](#webots-configuration)
+- [Project Rules](#project-rules)
+- [Docker Database Setup](#docker-database-setup)
+- [Container Management](#container-management)
 
-## Installazione ambiente di sviluppo
-### Come installare le dependencies:
-**Automaticamente (script):**  
-``` bash setup.sh ```  
-crea l'ambiente virtuale e scarica le dependencies (stampa il path da inserire in webots)
+---
 
-oppure manualmente:
-- Installare il virtual enviorment 
-```  python3.12 -m venv .venv ```
+## TODOs
+Please refer to [TODO.md](./TODO.md) for the active list of project tasks and milestones.
 
-- Attivare il venv (unico dei tre comandi da fare sempre)
-```source .venv/bin/activate```
+---
 
-- Installare i requirements (*requirements.txt è stato aggiornato il 15/04/2026, se ci sono problemi con le dipendenze, controllare che sia aggiornato*)
-```pip install -r requirements.txt```
+## Development Environment Setup
 
-### Come usare il venv in webots:
-1. Copiare il path restituito dallo script (oppure in `.venv > bin > python3.12` e fare tasto destro per copiare il percorso assoluto.)
-2. Su webots andare in: `Webots > preferences > Python commands` e incollare il nuovo percorso nel box apposito.
+### Installing Dependencies
 
-### Regole:
-- Non salvare da webots il mondo (cmd + shift + S / ctrl + shift + S) altrimenti i commenti del file .wbt vengono persi, nel caso non pushare il codice
+**Option A: Automatic Setup (Recommended)**  
+Run the provided setup script. It will automatically create a virtual environment and install all necessary dependencies. At the end of the script, it will print the absolute path to your Python interpreter, which you'll need for Webots.
+```bash
+./setup.sh
+```
 
+**Option B: Manual Setup**  
+If you prefer to set up the environment manually, follow these steps:
+1. **Create the virtual environment:**
+   ```bash
+   python3.12 -m venv .venv
+   ```
+2. **Activate the virtual environment** *(You must do this every time you open a new terminal):*
+   ```bash
+   source .venv/bin/activate
+   ```
+3. **Install the requirements:**
+   *(Note: `requirements.txt` was last updated on 04/15/2026. If you experience dependency issues, ensure you pull the latest version).*
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-## Installazione database su docker
+---
 
-Questa guida ti mostrerà come installare Docker, avviare un container MySQL e creare la struttura del database per salvare i log del tuo simulatore robotico.
+## Webots Configuration
 
-### Passo 1: Installare Docker Desktop
+To link your Python virtual environment with Webots:
+1. **Get the Python Path:** Use the path printed by the `setup.sh` script. Alternatively, you can find the absolute path manually by navigating to `.venv/bin/python3.12` and copying it.
+2. **Set the Path in Webots:** Open Webots and navigate to `Webots > Preferences > Python commands`. Paste the copied absolute path into the dedicated input box.
 
-1. Vai sul sito ufficiale [docker.com](https://www.docker.com/products/docker-desktop) e scarica **Docker Desktop** per il tuo sistema operativo (Mac, Windows o Linux).
-2. Installa l'applicazione seguendo la procedura standard del tuo sistema.
-3. Apri Docker Desktop e **attendi che si avvii completamente**.
+---
 
-### Passo 2: Avviare il Container MySQL
+## Project Rules
 
-Apri il tuo terminale (o Prompt dei comandi) ed esegui questo comando per scaricare e avviare MySQL in background:
+> [!WARNING]
+> **Never save the world directly from Webots** using `Cmd + Shift + S` or `Ctrl + Shift + S`. Doing so overwrites the `.wbt` file and strips all custom comments. If you accidentally save it, do not commit or push the resulting code to the repository!
+
+---
+
+## Docker Database Setup
+
+This section outlines how to install Docker, start a MySQL container, and set up the database structure required to store the robotic simulator logs.
+
+### Step 1: Install Docker Desktop
+1. Download **Docker Desktop** for your operating system from the official site: [docker.com](https://www.docker.com/products/docker-desktop).
+2. Follow the standard installation process for your OS.
+3. Open Docker Desktop and **wait for the Docker Engine to fully start**.
+
+### Step 2: Start the MySQL Container
+Open your terminal and execute the following command to download and run the MySQL container in the background:
 
 ```bash
 docker run --name agv-logger -e MYSQL_ROOT_PASSWORD=agv_pass -p 3306:3306 -d mysql:latest
 ```
-- **`--name agv-logger`**: Assegna un nome al container per facilitarne la gestione.
-- **`-e MYSQL_ROOT_PASSWORD=agv_pass`**: Imposta la password per l'utente root di MySQL (puoi cambiarla se vuoi, ma ricordati!).
-- **`-d`**: Avvia il container in modalità "detached" (in background).
-- **`-p 3306:3306`**: Espone la porta standard di MySQL per permettere al tuo script Python di comunicare con il database (la porta di sinistra può essere cambiata, per comodità utilizziamo la stessa).
-- **`mysql:latest`**: Specifica l'immagine di MySQL da utilizzare: [mysql](https://hub.docker.com/_/mysql).
+- `--name agv-logger`: Assigns an easy-to-remember name to your container.
+- `-e MYSQL_ROOT_PASSWORD=agv_pass`: Sets the MySQL root password to `agv_pass` (you can change this, but make sure to remember it!).
+- `-d`: Runs the container in detached mode (background).
+- `-p 3306:3306`: Maps the standard MySQL port to allow your Python script to communicate with the database.
+- `mysql:latest`: Pulls the latest official MySQL image from Docker Hub.
 
-### Passo 3: Accedere alla Console di MySQL
-
-Ora dobbiamo "entrare" nel container per creare il database. Esegui:
+### Step 3: Access the MySQL Console
+To create the database, access the container's interactive terminal:
 
 ```bash
 docker exec -it agv-logger mysql -u root -p
 ```
+*When prompted for a password, type `agv_pass` and press Enter (the characters will be hidden as you type).*
 
-*Ti verrà richiesta la password in quanto stiamo entrando come utente root. Digita `agv_pass` e premi Invio (non vedrai i caratteri mentre digiti).*
+### Step 4: Create the Database and Tables
+Once inside the MySQL console (you will see the `mysql>` prompt), execute the following commands:
 
-### Passo 4: Creare il Database e la Tabella
+1. **Create and select the database:**
+   ```sql
+   CREATE DATABASE agv_data;
+   USE agv_data;
+   ```
 
-Una volta dentro la console di MySQL (il prompt mostrerà `mysql>`), copia e incolla i seguenti comandi uno alla volta:
+2. **Initialize the log tables:**
+   Open the `Database_Structure.sql` file in your editor and copy-paste the queries into the console. Ensure you execute each query separately rather than all at once.
 
-**1. Crea e seleziona il database:**
+If successful, you will see a `Query OK` message. You can exit the console by typing `EXIT;`.
 
-```sql
-CREATE DATABASE agv_data;
-USE agv_data;
-```
+> [!NOTE]
+> - Ensure the `mysql-connector-python` package is installed in your Python environment.
+> - Always check `Database_Structure.sql` when pulling new updates. If the database schema has changed, you must run the new queries to update your local database structure.
 
-**2. Crea le tabelle per il log:**
-
-Copiare ed incollare le diferse query per creare le tabelle che si trovano all'interno di [Database_Structure.sql](Database_Structure.sql) (assicurati di eseguire ogni query separatamente, non tutto in una volta).
-
-Se tutto è andato a buon fine, vedrai il messaggio `Query OK`. Puoi uscire digitando `EXIT;`.
-
-> ricordarsi di installare il nuovo pacchetto di python chiamato `mysql-connector-python`.
-> ricordarsi di controllare sempre il file `Database_Structure.sql` per eventuali aggiornamenti alla struttura del database, e di eseguire le query per modificare il db se ci sono modifiche
 ---
 
-### Gestione del Container: Uscire, Fermare e Riavviare
+## Container Management
 
-#### 1. Uscire dalla console MySQL (`exit`)
-
-Se ti trovi all'interno della riga di comando di MySQL (dove vedi il prompt `mysql>`), devi prima tornare al terminale normale del tuo sistema. Digita semplicemente:
-
+### 1. Exiting the MySQL Console
+If you are inside the MySQL command line (`mysql>`), you must exit to return to your normal system terminal. Type:
 ```sql
 exit;
 ```
+*(You will see a "Bye" message).*
 
-*(Vedrai il messaggio "Bye" e il terminale tornerà al prompt standard del tuo Mac).*
-
-#### 2. Fermare il container (`docker stop`)
-
-Anche se sei uscito da MySQL, il database sta ancora girando in background. Per "spegnerlo" e liberare le risorse del computer, usa il comando `stop` seguito dal nome che hai dato al tuo container:
-
+### 2. Stopping the Container
+Even after exiting the MySQL console, the database container remains running in the background. To stop it and free up system resources, run:
 ```bash
 docker stop agv-logger
 ```
 
-#### 3. Far ripartire il container (`docker start`)
-
-Quando sei pronto a riprendere la tua simulazione su Webots, **non devi eseguire di nuovo il comando `docker run`** (ti darebbe errore dicendo che il nome esiste già). Ti basta "riaccendere" il container esistente:
-
+### 3. Restarting the Container
+When you are ready to resume your Webots simulation, **do not** use `docker run` again (this will throw an error since the container name already exists). Instead, simply start the existing container:
 ```bash
 docker start agv-logger
 ```
 
-Una volta avviato bisognerà aspettare rientrare nella console di MySQL (con `docker exec -it agv-logger mysql -u root -p`) e inserendo la password. Dunque selezionare il database (`USE agv_data;`) prima di poter eseguire query o inserire dati.
+Once started, if you need to manage the database manually, you can re-enter the console using `docker exec -it agv-logger mysql -u root -p`, enter the password, and select the database (`USE agv_data;`) before executing any queries.
+
+---
+
+## Real-Time Dashboard
+
+We have a built-in Streamlit dashboard to monitor the AGV's telemetry, local planning grid, and AI camera feed in real-time.
+
+To start the dashboard:
+1. Ensure your virtual environment is activated (`source .venv/bin/activate`).
+2. Run the following command:
+   ```bash
+   streamlit run dashboard/app.py
+   ```
+3. The dashboard will automatically open in your browser (usually at `http://localhost:8501`). For more details, see [docs/dashboard.md](docs/dashboard.md).
