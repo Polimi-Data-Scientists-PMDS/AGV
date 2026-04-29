@@ -68,12 +68,6 @@ class AGVSimulation:
                 
                 # --- UPDATE ENVIRONMENT ---
                 self.environment.update_all(current_time)
-                # --- PRINTING & DATABASE SAVING (Based on previous tick's data) ---
-                if self.__should_log(current_time):
-                    print("5s passed, saving log...")
-                    self.logger.save()
-                    self.logger.save_to_database()
-                    self.last_db_save = current_time
                 
                 # ---------------------------------------------------------------
                 # --- 1. PERCEPTION ---
@@ -95,13 +89,19 @@ class AGVSimulation:
                 # ---------------------------------------------------------------
 
 
-                # --- PRINT  ---
-                if self.__should_print(current_time):
-                    self.__print_data(current_time, sensor_data, state, goal, path, command)
+                # --- PRINT AND LOG  ---
+                if self.__should_print_and_log(current_time):
+                    self.__print_and_log_data(current_time, sensor_data, state, goal, path, command)
                     self.last_print_time = current_time
-                # --- LOG UPDATE  ---
+                # --- UPDATE LOGGGER STATE  ---
                 self.logger.update_obstacle_state(current_time, path.has_obstacle, sensor_data)
                 self.logger.update_idle_state(current_time, state)
+                # --- UPDATE DATABASE ---
+                if self.__should_save_to_database(current_time):
+                    print("5s passed, saving log...")
+                    self.logger.save()
+                    self.logger.save_to_database()
+                    self.last_db_save = current_time
                 
 
 
@@ -140,19 +140,16 @@ class AGVSimulation:
         
         return goal
 
-    def __should_log(self, current_time):
+    def __should_save_to_database(self, current_time):
         return current_time - self.last_db_save >= self.log_config.log_interval
 
-    def __should_print(self, current_time):
+    def __should_print_and_log(self, current_time):
         return current_time - self.last_print_time >= self.log_config.print_interval
 
-    def __print_data(self, current_time, sensor_data, state, goal, path, command):
-        next_point = path.waypoints[0] if len(path.waypoints) > 0 else None
-
-        v_l_real, v_r_real = self.hardware.motors.get_velocities()
-        gps_x, gps_y = self.hardware.gps.get_position()
-        
+    def __print_and_log_data(self, current_time, sensor_data, state, goal, path, command):
         self.logger.log_realtime(sensor_data, state, goal, command)
+        
+        next_point = path.waypoints[0] if len(path.waypoints) > 0 else None
         
         print("="*40)
         # status = "GOAL REACHED!" if dist_e < self.config.GOAL_REACHED_THRESH else "MOVING..."
