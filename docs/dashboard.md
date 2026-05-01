@@ -5,10 +5,11 @@
 ### What I did
 I designed and implemented a lightweight, real-time dashboard using **Streamlit** to visualize the dynamics and live state of the Autonomous Guided Vehicle (AGV). 
 The interface provides continuous updates to:
-- The robot's spatial coordinates and heading ($x$, $y$, $\theta$).
-- GPS sensor readings.
-- Tracking metrics including distance and heading errors relative to the current goal.
-- Current and target (commanded) velocities (linear and angular).
+- **Time**: The current simulation time.
+- **Targets**: Real-time coordinates of the current Goal and the immediate Next Point.
+- **Position**: The robot's spatial coordinates and heading ($x$, $y$, $\theta$), plus raw GPS sensor readings.
+- **Tracking Errors**: Distance and heading errors relative to the current goal.
+- **Velocities**: Current and target (commanded) linear and angular velocities.
 - A 2D live map plotting the robot's current position, orientation, fixed static obstacles (Work Islands and Walls), and its relative location to known waypoints, properly scaled to the warehouse's 69x22 meter dimensions.
 - **Live Local Planner Grid**: A real-time video feed displaying the navigation logic matrix.
 - **Robot AI Camera**: A real-time video feed displaying the YOLO-based object detection output from the robot's onboard camera.
@@ -40,14 +41,24 @@ pip install -r requirements.txt
 
 ### Running the Dashboard
 
-To launch the dashboard, open a new terminal window, ensure your virtual environment is activated, and run:
+**Auto-Launch Integration**: 
+You do not need to run the dashboard manually. The Webots `DefaultController` is programmed to automatically detect if the dashboard is running on port 8501. 
+- If it is not running, Webots will spin it up in the background and open it in your default web browser.
+- If it is already running, Webots will simply open a new browser tab directed to the existing session.
 
+If you ever need to run it manually (for debugging), activate your virtual environment and run:
 ```bash
 streamlit run dashboard/app.py
 ```
 
+### Stopping the Dashboard
+Because the dashboard runs independently in the background, it will stay alive even after you stop the Webots simulation. To explicitly terminate it and free up port 8501, run the following command in your terminal:
+```bash
+pkill -f "streamlit run .*dashboard/app.py"
+```
+
 ### Expected Behavior
-1. Streamlit will launch a local web server (usually at `http://localhost:8501`) and automatically open it in your default web browser.
+1. Streamlit runs a local web server (usually at `http://localhost:8501`).
 2. If the AGV simulation **is currently running** in Webots, the metrics, map, and visualizers will update in real-time.
 3. If the simulation is **stopped**, the dashboard will display the very last known state of the robot before the simulation ended.
 4. You can use the left sidebar to adjust the `Refresh Rate (FPS)` slider to match your desired frame rate dynamically.

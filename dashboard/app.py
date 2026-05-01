@@ -93,6 +93,15 @@ def main():
         st.subheader("Robot Dynamics")
         time_placeholder = st.empty()
         
+        st.markdown("### Targets")
+        w1, w2 = st.columns(2)
+        goal_pt_x = w1.empty()
+        goal_pt_y = w2.empty()
+        
+        w3, w4 = st.columns(2)
+        next_pt_x = w3.empty()
+        next_pt_y = w4.empty()
+        
         st.markdown("### Coordinates")
         c1, c2, c3 = st.columns(3)
         state_x = c1.empty()
@@ -137,6 +146,18 @@ def main():
         else:
             time_placeholder.metric(label="Current Time (s)", value=f"{data.get('time', 0.0):.2f}")
             
+            goal = data.get('goal_position', {})
+            goal_pt_x.metric("Goal X", f"{goal.get('x', 0.0):.2f}")
+            goal_pt_y.metric("Goal Y", f"{goal.get('y', 0.0):.2f}")
+            
+            next_pt = data.get('next_point')
+            if next_pt:
+                next_pt_x.metric("Next Point X", f"{next_pt.get('x', 0.0):.2f}")
+                next_pt_y.metric("Next Point Y", f"{next_pt.get('y', 0.0):.2f}")
+            else:
+                next_pt_x.metric("Next Point X", "None")
+                next_pt_y.metric("Next Point Y", "None")
+                
             state = data.get('state', {})
             state_x.metric("State X", f"{state.get('x', 0.0):.2f}")
             state_y.metric("State Y", f"{state.get('y', 0.0):.2f}")

@@ -47,7 +47,6 @@ class ObjectDetector:
         # We don't want to run heavy AI every 1ms (your simulation timestep).
         # This restricts the AI to run at 10 FPS (every 0.1 seconds), keeping Webots smooth.
         if current_time - self.last_process_time < 0.1:
-            cv2.waitKey(1) # Keep the OpenCV window from freezing
             return None
             
         self.last_process_time = current_time
@@ -67,10 +66,7 @@ class ObjectDetector:
         # 2. Draw the bounding boxes automatically
         annotated_frame = results[0].plot()
 
-        # 3. Display the live video feed
-        cv2.imshow("AGV AI Camera", annotated_frame)
-        cv2.waitKey(1) 
-        
+        # 3. Save the live video feed to disk
         # Save the frame to disk so the Streamlit dashboard can access it
         log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "logs"))
         os.makedirs(log_dir, exist_ok=True)

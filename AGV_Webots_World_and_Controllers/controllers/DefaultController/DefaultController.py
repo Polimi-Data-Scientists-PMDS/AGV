@@ -173,7 +173,36 @@ class AGVSimulation:
         # # print(f"\nRobot velocities:\n  Linear : {lin_vel:.2f} m/s\n  Angular: {ang_vel:.2f} rad/s")
         # print("="*40)
 
+def launch_dashboard():
+    import socket
+    import subprocess
+    import os
+    import sys
+    import webbrowser
+    import urllib.request
+
+    dashboard_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "dashboard", "app.py"))
+    
+    # Check if port 8501 is in use
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        in_use = s.connect_ex(('localhost', 8501)) == 0
+        
+    if not in_use:
+        print("Starting Streamlit Dashboard on port 8501...")
+        # Streamlit automatically opens a browser tab when it first runs
+        subprocess.Popen([sys.executable, "-m", "streamlit", "run", dashboard_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        print("Dashboard appears to be running on port 8501. Opening browser...")
+        
+        # Verify it's actually responding, then open the browser window
+        try:
+            urllib.request.urlopen("http://localhost:8501/_stcore/health", timeout=2)
+            webbrowser.open("http://localhost:8501")
+        except Exception:
+            # Even if health check fails, open it just in case
+            webbrowser.open("http://localhost:8501")
 
 if __name__ == "__main__":
+    launch_dashboard()
     app = AGVSimulation()
     app.run()
