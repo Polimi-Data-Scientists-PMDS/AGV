@@ -206,6 +206,8 @@ class RobotLog:
             }
             with open(self.log_file_path, "a", encoding="utf-8") as log_file:
                 log_file.write(json.dumps(events_dict) + "\n")
+        
+        print(f"Saved {len(self.events)} events to {self.log_file_path}")
 
     def save_to_database(self):
         """
@@ -215,6 +217,7 @@ class RobotLog:
 
         conn = None
         cursor = None
+        v = "simulation summary"
         try:
             conn = mysql.connector.connect(
                 host=self.db_host,
@@ -250,7 +253,7 @@ class RobotLog:
                     error_distance, error_heading,
                     current_vel_linear, current_vel_angular,
                     target_vel_linear, target_vel_angular
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
 
             db_event_telemetry = [
@@ -283,6 +286,7 @@ class RobotLog:
             conn.commit()
             print("Successfully saved simulation summary to the database.")
 
+            v = "events"
 
             # Batch insert using executemany for high performance
             cursor.executemany(insert_query_events, db_events)
@@ -291,7 +295,9 @@ class RobotLog:
             self.events = []
             print("Cleared events after saving to database.")
 
+            v="event telemetry"
 
+            # Batch insert using executemany for high performance
             cursor.executemany(insert_query_events_telemetry, db_event_telemetry)
             conn.commit()
             print(f"Successfully saved {len(self.event_telemetry)} event telemetry records to the database.")
@@ -299,7 +305,7 @@ class RobotLog:
             print("Cleared event telemetry after saving to database.")
 
         except Exception as e:
-            print(f"Failed to save events to database: {e}")
+            print(f"Failed to save {v} to database: {e}")
 
         finally:
             if cursor is not None:
