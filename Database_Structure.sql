@@ -32,6 +32,8 @@ CREATE TABLE EventTelemetry (
   current_vel_angular DOUBLE NOT NULL,
   target_vel_linear DOUBLE NOT NULL,
   target_vel_angular DOUBLE NOT NULL,
+  next_point_x DOUBLE,
+  next_point_y DOUBLE,
   FOREIGN KEY (sim_id) REFERENCES Simulations(id),
   FOREIGN KEY (sim_id, event_time, e_type) REFERENCES Events(sim_id, sim_time, e_type)
 );

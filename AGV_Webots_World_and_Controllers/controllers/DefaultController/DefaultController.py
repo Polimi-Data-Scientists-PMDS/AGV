@@ -149,28 +149,29 @@ class AGVSimulation:
         return current_time - self.last_print_time >= self.log_config.print_interval
 
     def __print_and_log_data(self, current_time, sensor_data, state, goal, path, command):
-        self.logger.log_realtime(sensor_data, state, goal, command)
-        
         next_point = path.waypoints[0] if len(path.waypoints) > 0 else None
+        self.logger.log_realtime(sensor_data, state, goal, command, next_point)
         
-        print("="*40)
-        # status = "GOAL REACHED!" if dist_e < self.config.GOAL_REACHED_THRESH else "MOVING..."
-        # print(f"Status: {status}")
-        print(f"Time: {current_time:.2f}s\n ")
-        print("---")
-        print(f"\nState:\t\t\t  x: {state.x:.2f} m\t  y: {state.y:.2f} m\t  th: {state.theta:.2f} rad")
-        print(f"\nVel:\t\t\t  v: {state.v:.2f} m/s\t  w: {state.omega:.2f} rad/s")
-        print("---")
-        print(f"\nNext:\t\t\t  " + f"x: {next_point.x:.1f} m\t  y: {next_point.y:.1f} m" if next_point is not None else "None")
-        print(f"\nGoal:\t\t\t  x: {goal.x:.1f} m\t  y: {goal.y:.1f} m")
-        print("---")
-        print(f"\nControl command:")
-        print(f"\t\t\t  r: {command.rho:.1f} m\t  alp: {command.alpha:.2f} rad")
-        print(f"\t\t\t  v: {command.v:.1f} m/s\t  w: {command.omega:.2f} rad/s")
-        print(f"\t\t\t  w_l: {command.w_l:.1f}\t  w_r: {command.w_r:.2f}")
+        # COMMENT PRINTS TO USE DASHBOARD
 
-        # print(f"\nRobot velocities:\n  Linear : {lin_vel:.2f} m/s\n  Angular: {ang_vel:.2f} rad/s")
-        print("="*40)
+        # print("="*40)
+        # # status = "GOAL REACHED!" if dist_e < self.config.GOAL_REACHED_THRESH else "MOVING..."
+        # # print(f"Status: {status}")
+        # print(f"Time: {current_time:.2f}s\n ")
+        # print("---")
+        # print(f"\nState:\t\t\t  x: {state.x:.2f} m\t  y: {state.y:.2f} m\t  th: {state.theta:.2f} rad")
+        # print(f"\nVel:\t\t\t  v: {state.v:.2f} m/s\t  w: {state.omega:.2f} rad/s")
+        # print("---")
+        # print(f"\nNext:\t\t\t  " + f"x: {next_point.x:.1f} m\t  y: {next_point.y:.1f} m" if next_point is not None else "None")
+        # print(f"\nGoal:\t\t\t  x: {goal.x:.1f} m\t  y: {goal.y:.1f} m")
+        # print("---")
+        # print(f"\nControl command:")
+        # print(f"\t\t\t  r: {command.rho:.1f} m\t  alp: {command.alpha:.2f} rad")
+        # print(f"\t\t\t  v: {command.v:.1f} m/s\t  w: {command.omega:.2f} rad/s")
+        # print(f"\t\t\t  w_l: {command.w_l:.1f}\t  w_r: {command.w_r:.2f}")
+
+        # # print(f"\nRobot velocities:\n  Linear : {lin_vel:.2f} m/s\n  Angular: {ang_vel:.2f} rad/s")
+        # print("="*40)
 
 
 if __name__ == "__main__":
