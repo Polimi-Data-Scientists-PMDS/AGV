@@ -12,6 +12,6 @@ In here we will keep track of the things we need to do. Will include done and no
 - Start writing a report in a separate `report` folder in a `.tex` file.
 
 ## Done
-- Restructure the project in order to have separate folers for each different controller and a single "main" folder which will be called by webots and will call the different controllers as needed. [[@matteoroda05](@matteoroda05)]
+- Restructure the project in order to have separate folders for each different controller and a single "main" folder which will be called by webots and will call the different controllers as needed. [[@matteoroda05](@matteoroda05)]
 - Fix time format for `sim_time` in order to have it sql compatible (HH:MM:SS). [[@matteoroda05](@matteoroda05)]
 - Separate LIDAR sensor, GPS sensor and other sensors into separate classes within the [SensorClasses](./AGV_Webots_World_and_Controllers/controllers/DefaultController/RobotController/SensorClasses) folder for **cleaner code** and **easier maintenance**.
