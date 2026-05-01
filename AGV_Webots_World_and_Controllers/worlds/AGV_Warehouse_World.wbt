@@ -6,6 +6,7 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Parquetry.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/humans/pedestrian/protos/Pedestrian.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/forklift/protos/Forklift.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/released/projects/humans/skin_animated_humans/protos/CharacterSkin.proto" 
 
 ### World Info and Floor ###
 WorldInfo {
@@ -1527,74 +1528,174 @@ Solid {
 }
 
 ### Moving parts ###
+
 # Worker 1
-DEF HUMAN_1 Pedestrian {
-  translation -16.0 6.0 1.27
+DEF HUMAN_1 Robot {
+  translation -16.0 6.0 0
   rotation 0 0 1 -1.57
+  children [
+    CharacterSkin {
+      model "Robert"
+    }
+  ]
+  boundingObject Pose {
+  translation 0 0 0.9
+  children [
+    Capsule {
+      height 1.8
+      radius 0.3
+    }
+  ]
+}
+physics Physics {}
   name "worker_1"
-  controller "pedestrian"
-  shirtColor 0.2 0.6 0.2
-  enableBoundingObject TRUE
+  controller "worker_controller"
+  supervisor FALSE
 }
 
 # Worker 2
-DEF HUMAN_2 Pedestrian {
-  translation -2.0 -2.0 1.27
+DEF HUMAN_2 Robot {
+  translation -2.0 -2.0 0
   rotation 0 0 1 0
+  children [
+    CharacterSkin {
+      model "Robert"
+    }
+  ]
+  boundingObject Pose {
+  translation 0 0 0.9
+  children [
+    Capsule {
+      height 1.8
+      radius 0.3
+    }
+  ]
+}
+physics Physics {}
   name "worker_2"
-  controller "pedestrian"
-  shirtColor 0.2 0.6 0.2
-  enableBoundingObject TRUE
+  controller "worker_controller"
+  supervisor FALSE
 }
 
 # Worker 3
-DEF HUMAN_3 Pedestrian {
-  translation -32.0 6.0 1.27
+DEF HUMAN_3 Robot {
+  translation -32.0 6.0 0
   rotation 0 0 1 -1.57
+  children [
+    CharacterSkin {
+      model "Robert"
+    }
+  ]
+  boundingObject Pose {
+  translation 0 0 0.9
+  children [
+    Capsule {
+      height 1.8
+      radius 0.3
+    }
+  ]
+}
+physics Physics {}
   name "worker_3"
-  controller "pedestrian"
-  shirtColor 0.2 0.6 0.2
-  enableBoundingObject TRUE
+  controller "worker_controller"
+  supervisor FALSE
 }
 
 # Worker 4
-DEF HUMAN_4 Pedestrian {
-  translation -9.0 -7.0 1.27
+DEF HUMAN_4 Robot {
+  translation -9.0 -7.0 0
   rotation 0 0 1 3.14
+  children [
+    CharacterSkin {
+      model "Robert"
+    }
+  ]
+  boundingObject Pose {
+  translation 0 0 0.9
+  children [
+    Capsule {
+      height 1.8
+      radius 0.3
+    }
+  ]
+}
+physics Physics {}
   name "worker_4"
-  controller "pedestrian"
-  shirtColor 0.2 0.6 0.2
-  enableBoundingObject TRUE
+  controller "worker_controller"
+  supervisor FALSE
 }
 
 # Worker 5
-DEF HUMAN_5 Pedestrian {
-  translation -0.2 6.0 1.27
+DEF HUMAN_5 Robot {
+  translation -0.2 6.0 0
   rotation 0 0 1 -1.57
+  children [
+    CharacterSkin {
+      model "Robert"
+    }
+  ]
+  boundingObject Pose {
+  translation 0 0 0.9
+  children [
+    Capsule {
+      height 1.8
+      radius 0.3
+    }
+  ]
+}
+physics Physics {}
   name "worker_5"
-  controller "pedestrian"
-  shirtColor 0.2 0.6 0.2
-  enableBoundingObject TRUE
+  controller "worker_controller"
+  supervisor FALSE
 }
 
 # Worker 6
-DEF HUMAN_6 Pedestrian {
-  translation 9.0 5.0 1.27
+DEF HUMAN_6 Robot {
+  translation 9.0 5.0 0
   rotation 0 0 1 0
+  children [
+    CharacterSkin {
+      model "Robert"
+    }
+  ]
+  boundingObject Pose {
+  translation 0 0 0.9
+  children [
+    Capsule {
+      height 1.8
+      radius 0.3
+    }
+  ]
+}
+physics Physics {}
   name "worker_6"
-  controller "pedestrian"
-  shirtColor 0.2 0.6 0.2
-  enableBoundingObject TRUE
+  controller "worker_controller"
+  supervisor FALSE
 }
 
+
 # Worker 7
-DEF HUMAN_7 Pedestrian {
-  translation -22.0 -2.0 1.27
+DEF HUMAN_7 Robot {
+  translation -22.0 -2.0 0
   rotation 0 0 1 1.57
+  children [
+    CharacterSkin {
+      model "Robert"
+    }
+  ]
+  boundingObject Pose {
+  translation 0 0 0.9
+  children [
+    Capsule {
+      height 1.8
+      radius 0.3
+    }
+  ]
+}
+physics Physics {}
   name "worker_7"
-  controller "pedestrian"
-  shirtColor 0.2 0.6 0.2
-  enableBoundingObject TRUE
+  controller "worker_controller"
+  supervisor FALSE
 }
 
 # Forklift 1

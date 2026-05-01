@@ -175,7 +175,7 @@ try:
         )
         controller.logger.update(sim_time, lin_vel, ang_vel)
 
-# TODO: remmove duplicate saving
+# TODO: remove duplicate saving
 finally:
     print("Controller stopped, saving log...")
     controller.logger.log_event(controller.robot.getTime(), "STOP", "Controller stopped")
