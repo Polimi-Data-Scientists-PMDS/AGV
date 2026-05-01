@@ -137,10 +137,14 @@ Once started, if you need to manage the database manually, you can re-enter the 
 
 We have a built-in Streamlit dashboard to monitor the AGV's telemetry, local planning grid, and AI camera feed in real-time.
 
-To start the dashboard:
-1. Ensure your virtual environment is activated (`source .venv/bin/activate`).
-2. Run the following command:
-   ```bash
-   streamlit run dashboard/app.py
-   ```
-3. The dashboard will automatically open in your browser (usually at `http://localhost:8501`). For more details, see [docs/dashboard.md](docs/dashboard.md).
+**Starting the Dashboard:**
+The dashboard is seamlessly integrated into the controller. **You do not need to start it manually.** When you run the Webots simulation, the `DefaultController` will automatically launch the Streamlit server in the background and open a new browser tab directed to `http://localhost:8501`.
+
+**Stopping the Dashboard:**
+Because it runs in the background, the dashboard will persist even if you stop the Webots simulation (allowing you to restart Webots without losing the dashboard window). 
+If you want to completely terminate the running dashboard and free up its port, open your terminal and run:
+```bash
+pkill -f "streamlit run .*dashboard/app.py"
+```
+
+For more details, see [docs/dashboard.md](docs/dashboard.md).
