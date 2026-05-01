@@ -336,8 +336,6 @@ class LocalGridVisualizer:
         tip = (int(center + 35 * np.cos(robot_theta)), int(center - 35 * np.sin(robot_theta)))
         cv2.arrowedLine(display_image, (center, center), tip, (0, 0, 255), 3)
 
-        cv2.imshow(self.window_name, display_image)
-        cv2.waitKey(1)
 
         # Save the grid image to disk so the Streamlit dashboard can access it
         import os
