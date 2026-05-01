@@ -7,6 +7,9 @@ AGV_Webots_World_and_Controllers/controllers/DefaultController/logs/*
 # ML Models
 *.pt
 
+# Webots garbage
+AGV_Webots_World_and_Controllers/worlds/.AGV_Warehouse_World.wbproj
+
 # ----------------------------------------
 # MacOS garbage
 .DS_Store
