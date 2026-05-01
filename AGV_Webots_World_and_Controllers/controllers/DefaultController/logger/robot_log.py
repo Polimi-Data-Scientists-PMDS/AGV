@@ -95,7 +95,7 @@ class RobotLog:
         self.last_time = sim_time
         self.log_event(sim_time, "START", "Controller started")
 
-    def log_realtime(self, sensor_data, state, goal, command):
+    def log_realtime(self, sensor_data, state, goal, command, next_point=None):
         data = {
             "time": sensor_data.time,
             "state": {"x": state.x, "y": state.y, "theta": state.theta},
@@ -103,7 +103,8 @@ class RobotLog:
             "errors": {"distance": command.rho, "heading": command.alpha},
             "current_velocities": {"linear": state.v, "angular": state.omega},
             "target_velocities": {"linear": command.v, "angular": command.omega},
-            "goal_position": {"x": goal.x, "y": goal.y}
+            "goal_position": {"x": goal.x, "y": goal.y},
+            "next_point": {"x": next_point.x, "y": next_point.y} if next_point else None
         }
 
         with open(self.realtime_log_file_path, "a", encoding="utf-8") as f:
@@ -136,6 +137,8 @@ class RobotLog:
             data.get("current_velocities", {}).get("angular", 0.0),
             data.get("target_velocities", {}).get("linear", 0.0),
             data.get("target_velocities", {}).get("angular", 0.0),
+            data.get("next_point", {}).get("x") if data.get("next_point") else None,
+            data.get("next_point", {}).get("y") if data.get("next_point") else None,
         )
     
         self.event_telemetry.append(x)
@@ -252,8 +255,9 @@ class RobotLog:
                     gps_x, gps_y, 
                     error_distance, error_heading,
                     current_vel_linear, current_vel_angular,
-                    target_vel_linear, target_vel_angular
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    target_vel_linear, target_vel_angular,
+                    next_point_x, next_point_y
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
 
             db_event_telemetry = [
@@ -263,7 +267,8 @@ class RobotLog:
                     gps_x, gps_y,
                     error_distance, error_heading,
                     current_vel_linear, current_vel_angular,
-                    target_vel_linear, target_vel_angular
+                    target_vel_linear, target_vel_angular,
+                    next_point_x, next_point_y
                 )
                 for (
                     sim_id, event_time, event_type,
@@ -271,7 +276,8 @@ class RobotLog:
                     gps_x, gps_y,
                     error_distance, error_heading,
                     current_vel_linear, current_vel_angular,
-                    target_vel_linear,target_vel_angular
+                    target_vel_linear,target_vel_angular,
+                    next_point_x, next_point_y
                 )
                 in self.event_telemetry
             ]
