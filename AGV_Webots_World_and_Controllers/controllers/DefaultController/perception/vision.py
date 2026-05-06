@@ -7,7 +7,7 @@ import numpy as np
 from ultralytics import YOLO
 import torch
 
-from config import VisionConfig
+from config import LOGS_DIR, VisionConfig
 
 
 class ObjectDetector:
@@ -68,9 +68,8 @@ class ObjectDetector:
 
         # 3. Save the live video feed to disk
         # Save the frame to disk so the Streamlit dashboard can access it
-        log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "logs"))
-        os.makedirs(log_dir, exist_ok=True)
-        cv2.imwrite(os.path.join(log_dir, "camera_feed.jpg"), annotated_frame)
+        os.makedirs(LOGS_DIR, exist_ok=True)
+        cv2.imwrite(os.path.join(LOGS_DIR, "camera_feed.jpg"), annotated_frame)
         
         # Return the raw detection data in case the robot needs to react to it later!
         return results[0].boxes

@@ -16,11 +16,11 @@ The interface provides continuous updates to:
 
 ### Why I did it
 - **Why Streamlit:** Streamlit is highly optimized for Python data applications. It allows us to rapidly prototype user interfaces directly from our Python scripts without needing to build a complex frontend in JavaScript or setting up complicated API endpoints for real-time WebSockets.
-- **Data Source Decision:** Instead of directly querying the MySQL database continuously—which could introduce latency and load—the dashboard reads from the localized `robot_controller_runs_realtime_panel.jsonl` file. It also reads individual JPEG image streams directly from the `logs` folder. These files are consistently overwritten by the controller with the absolute latest state variables, ensuring $O(1)$ read complexity with minimal overhead.
+- **Data Source Decision:** Instead of directly querying the MySQL database continuously—which could introduce latency and load—the dashboard reads from the localized `robot_controller_runs_realtime_panel.jsonl` file. It also reads individual JPEG image streams directly from the `logging/logs` folder. These files are consistently overwritten by the controller with the absolute latest state variables, ensuring $O(1)$ read complexity with minimal overhead.
 
 ### Workflow
-1. The Webots Python controller captures the simulation state and dumps the latest telemetry frame and image streams (`camera_feed.jpg` & `local_planner_grid.jpg`) to the `logs/` directory every cycle.
-2. The Streamlit application (`dashboard/app.py`) reads these files at a customizable FPS.
+1. The Webots Python controller captures the simulation state and dumps the latest telemetry frame and image streams (`camera_feed.jpg` & `local_planner_grid.jpg`) to the `logging/logs/` directory every cycle.
+2. The Streamlit application (`web-app/app.py`) reads these files at a customizable FPS.
 3. Using `matplotlib`, the dashboard recalculates and draws the robot's coordinates on a static warehouse grid.
 4. Streamlit avoids full-page flickering by utilizing an infinite `while True` loop that targets and updates specific UI components (`st.empty()`) in-place, creating a seamless, true video-feed experience.
 
@@ -48,13 +48,13 @@ You do not need to run the dashboard manually. The Webots `DefaultController` is
 
 If you ever need to run it manually (for debugging), activate your virtual environment and run:
 ```bash
-streamlit run dashboard/app.py
+streamlit run web-app/app.py
 ```
 
 ### Stopping the Dashboard
 Because the dashboard runs independently in the background, it will stay alive even after you stop the Webots simulation. To explicitly terminate it and free up port 8501, run the following command in your terminal:
 ```bash
-pkill -f "streamlit run .*dashboard/app.py"
+pkill -f "streamlit run .*web-app/app.py"
 ```
 
 ### Expected Behavior

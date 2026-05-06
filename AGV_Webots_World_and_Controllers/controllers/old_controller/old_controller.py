@@ -5,7 +5,16 @@ from controller import Robot # type: ignore
 import numpy as np 
 import time
 import os
-from log.RobotLog import RobotLog
+import sys
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", ".."))
+LOGGER_DIR = os.path.join(PROJECT_ROOT, "logging", "logger")
+LOGS_DIR = os.path.join(PROJECT_ROOT, "logging", "logs")
+if LOGGER_DIR not in sys.path:
+    sys.path.append(LOGGER_DIR)
+
+from robot_log import RobotLog
 
 DISTANCE_BETWEEN_WHEELS = 0.052 #(m) distance between wheels found in the robot manual
 WHEEL_RADIUS = 0.02 #(m) wheel radius found in the robot manual
@@ -107,8 +116,8 @@ print(f"GPS Coordinate System: {gps.getCoordinateSystem()}")
 
 
 # Robot log setup
-log_file_path = os.path.join(os.path.dirname(__file__), 'robot_history.jsonl')
-robot_log = RobotLog(log_file_path)
+log_file_path = os.path.join(LOGS_DIR, 'robot_history.jsonl')
+robot_log = RobotLog(log_file_path, controller_version="old_controller")
 robot_log.start(robot.getTime())
 
 # Variables for printing the sensor value every 1 second 
@@ -212,4 +221,3 @@ while robot.step(timestep) != -1:
 robot_log.log_event(robot.getTime(), "STOP", "Controller stopped")
 robot_log.save()
 print(f"Robot history saved in: {log_file_path}")
-

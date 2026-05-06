@@ -9,11 +9,13 @@ import math
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", "RobotLog"))
-if LOG_DIR not in sys.path:
-    sys.path.append(LOG_DIR)
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", "..", ".."))
+LOGGER_DIR = os.path.join(PROJECT_ROOT, "logging", "logger")
+LOGS_DIR = os.path.join(PROJECT_ROOT, "logging", "logs")
+if LOGGER_DIR not in sys.path:
+    sys.path.append(LOGGER_DIR)
 
-from RobotLog import RobotLog 
+from robot_log import RobotLog 
 
 @dataclass
 class Position:
@@ -140,7 +142,7 @@ class RobotController_v1:
         # OTHER
         self.last_print_time = 0.0
         self.last_db_save = 0.0
-        log_file_path = os.path.join(LOG_DIR, "robot_controller_runs.jsonl")
+        log_file_path = os.path.join(LOGS_DIR, "robot_controller_runs.jsonl")
         self.logger = RobotLog(log_file_path, controller_version="v1")
         self.logger.start(self.robot.getTime())
 

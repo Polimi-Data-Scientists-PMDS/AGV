@@ -6,16 +6,12 @@ import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="AGV Real-Time Dashboard", layout="wide", initial_sidebar_state="expanded")
 
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(APP_DIR, ".."))
+LOGS_DIR = os.path.join(PROJECT_ROOT, "logging", "logs")
+
 # Path to the realtime panel JSONL file
-LOG_FILE_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "..",
-    "AGV_Webots_World_and_Controllers",
-    "controllers",
-    "DefaultController",
-    "logs",
-    "robot_controller_runs_realtime_panel.jsonl"
-)
+LOG_FILE_PATH = os.path.join(LOGS_DIR, "robot_controller_runs_realtime_panel.jsonl")
 
 # Relevant points from documentation
 POINTS = {
@@ -51,25 +47,9 @@ OBSTACLES = [
     [-28.57, 0, 0.5, 14.71]
 ]
 
-LOCAL_GRID_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "..",
-    "AGV_Webots_World_and_Controllers",
-    "controllers",
-    "DefaultController",
-    "logs",
-    "local_planner_grid.jpg"
-)
+LOCAL_GRID_PATH = os.path.join(LOGS_DIR, "local_planner_grid.jpg")
 
-CAMERA_FEED_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "..",
-    "AGV_Webots_World_and_Controllers",
-    "controllers",
-    "DefaultController",
-    "logs",
-    "camera_feed.jpg"
-)
+CAMERA_FEED_PATH = os.path.join(LOGS_DIR, "camera_feed.jpg")
 
 def load_data():
     try:

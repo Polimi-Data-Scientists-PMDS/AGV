@@ -5,7 +5,7 @@ import heapq
 from planning.planning_interface import PlanningInterface, Path
 from perception.perception import SensorData
 from localization.localization import RobotState, Position
-from config import GridPlanningConfig
+from config import GridPlanningConfig, LOGS_DIR
 
 class GridPlanner(PlanningInterface):
     def __init__(self, logger, lidar_specs):
@@ -339,6 +339,5 @@ class LocalGridVisualizer:
 
         # Save the grid image to disk so the Streamlit dashboard can access it
         import os
-        log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "logs"))
-        os.makedirs(log_dir, exist_ok=True)
-        cv2.imwrite(os.path.join(log_dir, "local_planner_grid.jpg"), display_image)
+        os.makedirs(LOGS_DIR, exist_ok=True)
+        cv2.imwrite(os.path.join(LOGS_DIR, "local_planner_grid.jpg"), display_image)
