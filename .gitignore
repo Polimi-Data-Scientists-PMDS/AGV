@@ -1,7 +1,7 @@
+# React
+web-app/node_modules/
+
 # RobotLog trash
-AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs_realtime.jsonl
-AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs_realtime_panel.jsonl
-AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs.jsonl
 logging/logs/*
 
 # ML Models
@@ -13,6 +13,11 @@ logging/logs/*
 # ----------------------------------------
 # MacOS garbage
 .DS_Store
+
+#Old RobotLog
+AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs_realtime.jsonl
+AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs_realtime_panel.jsonl
+AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs.jsonl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
