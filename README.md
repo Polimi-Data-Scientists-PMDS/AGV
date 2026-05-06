@@ -42,6 +42,23 @@ If you prefer to set up the environment manually, follow these steps:
    pip install -r requirements.txt
    ```
 
+### Installing React Dashboard Dependencies
+
+The React dashboard dependencies are installed locally inside `web-app/`. This creates a `node_modules/` folder, which is generated dependency code and should not be committed.
+
+```bash
+cd web-app
+npm install react react-dom
+npm install -D typescript vite @vitejs/plugin-react @types/react @types/react-dom
+```
+
+After the dependencies are installed, other contributors can restore the same local packages from `package-lock.json` with:
+
+```bash
+cd web-app
+npm install
+```
+
 ---
 
 ## Webots Configuration
