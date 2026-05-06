@@ -1,6 +1,12 @@
 # config.py
+import os
 import numpy as np
 from dataclasses import dataclass
+
+DEFAULT_CONTROLLER_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(DEFAULT_CONTROLLER_DIR, "..", "..", ".."))
+LOGGER_DIR = os.path.join(PROJECT_ROOT, "logging", "logger")
+LOGS_DIR = os.path.join(PROJECT_ROOT, "logging", "logs")
 
 @dataclass(frozen=True)
 class TaskConfig:
@@ -111,7 +117,6 @@ class SectorPlanningConfig(PlanningConfig):
 class LogConfig:
     log_interval = 5.0      # s
     print_interval = 0.5    # s
-
 
 
 

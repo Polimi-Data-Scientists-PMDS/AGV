@@ -3,7 +3,7 @@ import json
 import mysql.connector
 
 class RobotLog:
-    def __init__(self, log_file_path, controller_version):
+    def __init__(self, log_file_path, controller_version="unknown"):
         # TODO: remove self.log_file_path once the database is verified working
         self.log_file_path = log_file_path
         self.realtime_log_file_path = log_file_path.replace(".jsonl", "_realtime.jsonl") if log_file_path.endswith(".jsonl") else log_file_path + "_realtime.jsonl"
@@ -187,6 +187,8 @@ class RobotLog:
             else:
                 self.log_event(current_time, "IDLE_END", f"linear_speed={state.v:.6f}, angular_speed={state.omega:.2f}")
             self.is_idle = currently_idle
+
+        self.last_time = current_time
 
     # TODO: remove this method after datbase integration is verified working, as we will be saving directly to the database instead of a JSONL file
     def save(self):

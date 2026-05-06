@@ -1,13 +1,10 @@
 import os
 import sys
 
-# Setup paths for RobotLog and imports
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "logs"))
-if LOG_DIR not in sys.path:
-    sys.path.append(LOG_DIR)
+from config import TaskConfig, PlanningConfig, LogConfig, LOGGER_DIR, LOGS_DIR
 
-from config import TaskConfig, PlanningConfig, LogConfig
+if LOGGER_DIR not in sys.path:
+    sys.path.append(LOGGER_DIR)
 
 from hardware.hardware_interface import HardwareInterface
 from hardware.webots_interface import WebotsInterface
@@ -20,7 +17,7 @@ from control.control import Control, ControlCommand
 
 from webots.dynamic_environment import DynamicEnvironment
 from utils.utils import calculate_control_errors
-from logger.robot_log import RobotLog 
+from robot_log import RobotLog 
 
 # from planning.grid_obstacle_avoidance import GridObstacleAvoider
 # from navigation.sector_obstacle_avoidance import SectorObstacleAvoider
@@ -117,7 +114,7 @@ class AGVSimulation:
 
     def __init_logger(self):
         """Initializes and starts the custom RobotLog."""
-        log_file_path = os.path.join(LOG_DIR, "robot_controller_runs.jsonl")
+        log_file_path = os.path.join(LOGS_DIR, "robot_controller_runs.jsonl")
         logger = RobotLog(log_file_path, controller_version="v1")
         logger.start(self.hardware.get_time())
         return logger
@@ -181,7 +178,7 @@ def launch_dashboard():
     import webbrowser
     import urllib.request
 
-    dashboard_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "dashboard", "app.py"))
+    dashboard_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "web-app", "app.py"))
     
     # Check if port 8501 is in use
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
