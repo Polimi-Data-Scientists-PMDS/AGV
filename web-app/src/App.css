@@ -1,0 +1,169 @@
+:root {
+  color: #31333f;
+  background: #ffffff;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #ffffff;
+}
+
+.dashboard {
+  box-sizing: border-box;
+  width: min(100%, 920px);
+  padding: 28px 28px 48px;
+}
+
+.dashboard h1,
+.dashboard h2,
+.metric-label,
+.metric-value,
+.loading-message {
+  margin: 0;
+  font-family: inherit;
+  color: inherit;
+}
+
+.dashboard h1 {
+  margin-bottom: 34px;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.dashboard-section {
+  margin-top: 40px;
+}
+
+.dashboard-section:first-of-type {
+  margin-top: 0;
+}
+
+.dashboard-section h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 7px;
+}
+
+.dashboard-section > .metric-row {
+  margin-top: 22px;
+}
+
+
+.dashboard-section summary {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.dashboard-section summary::-webkit-details-marker {
+  display: none;
+}
+
+
+.metric-row {
+  --metric-gap: 20px;
+  --metric-width: 180px;
+
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--metric-width);
+  column-gap: var(--metric-gap);
+
+  width: fit-content;
+  margin-top: 24px;
+}
+
+.metric-row:first-child {
+  margin-top: 0;
+}
+
+.metric-row .metric {
+  min-width: 0;
+  position: relative;
+}
+
+.metric-row .metric:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--metric-gap) / -0.75);
+  width: 2px;
+  background: #b8bbc5;
+}
+
+.metric-row .metric:first-child {
+  padding-left: 0;
+}
+
+.metric-label {
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.metric-value {
+  display: block;
+  margin-top: 12px;
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.metric-unit {
+  margin-left: 1.5px;
+  font-size: 0.45em;
+  font-weight: 300;
+  /* font-style: italic; */
+  vertical-align: baseline;
+}
+
+.dashboard-section > .metric {
+  margin-top: 0;
+}
+
+.loading-message {
+  font-size: 16px;
+}
+
+@media (max-width: 720px) {
+  .dashboard {
+    padding: 24px 20px 44px;
+  }
+
+  .dashboard h1 {
+    font-size: 32px;
+  }
+
+  .dashboard-section h2 {
+    font-size: 24px;
+  }
+
+  .metric-row {
+    grid-template-columns: 1fr;
+    row-gap: 28px;
+  }
+
+  .metric-row .metric {
+    padding: 0;
+    border-left: 0;
+  }
+
+  .metric-row .metric::before {
+    display: none;
+  }
+
+  .metric-label {
+    font-size: 16px;
+  }
+
+  .metric-value {
+    margin-top: 10px;
+    font-size: 34px;
+  }
+}
