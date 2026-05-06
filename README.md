@@ -144,7 +144,7 @@ The dashboard is seamlessly integrated into the controller. **You do not need to
 Because it runs in the background, the dashboard will persist even if you stop the Webots simulation (allowing you to restart Webots without losing the dashboard window). 
 If you want to completely terminate the running dashboard and free up its port, open your terminal and run:
 ```bash
-pkill -f "streamlit run .*dashboard/app.py"
+pkill -f "streamlit run .*web-app/app.py"
 ```
 
 For more details, see [docs/dashboard.md](docs/dashboard.md).

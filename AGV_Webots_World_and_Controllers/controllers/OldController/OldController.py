@@ -6,19 +6,16 @@ import sys
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "OldRobotLog"))
-if LOG_DIR not in sys.path:
-    sys.path.append(LOG_DIR)
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", ".."))
+LOGGER_DIR = os.path.join(PROJECT_ROOT, "logging", "logger")
 ROBOT_CONTROLLER_v1_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "RobotControllers"))
 
-for path in (LOG_DIR, ROBOT_CONTROLLER_v1_DIR):
+for path in (LOGGER_DIR, ROBOT_CONTROLLER_v1_DIR):
     if path not in sys.path:
         sys.path.append(path)
 
 from RobotControllers.RobotController_v1 import RobotController_v1 
 from MovingWalls import MovingWalls
-# Currently useless:
-# from RobotLog import RobotLog 
 
 # MAIN
 

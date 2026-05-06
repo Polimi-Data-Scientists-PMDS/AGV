@@ -2,7 +2,7 @@
 AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs_realtime.jsonl
 AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs_realtime_panel.jsonl
 AGV_Webots_World_and_Controllers/controllers/OldRobotLog/robot_controller_runs.jsonl
-AGV_Webots_World_and_Controllers/controllers/DefaultController/logs/*
+logging/logs/*
 
 # ML Models
 *.pt
