@@ -1,7 +1,7 @@
 import os
 import sys
 
-from config import TaskConfig, PlanningConfig, LogConfig, LOGGER_DIR, LOGS_DIR
+from config import TaskConfig, PlanningConfig, LogConfig, LOGGER_DIR, LOGS_DIR, use_react
 
 if LOGGER_DIR not in sys.path:
     sys.path.append(LOGGER_DIR)
@@ -90,6 +90,8 @@ class AGVSimulation:
                 if self.__should_print_and_log(current_time):
                     self.__print_and_log_data(current_time, sensor_data, state, goal, path, command)
                     self.last_print_time = current_time
+                else: 
+                    self.logger.log_realtime(sensor_data, state, goal, command, path.waypoints[0] if len(path.waypoints) > 0 else None) 
                 # --- UPDATE LOGGGER STATE  ---
                 # TODO: add `has_obstacle` to the path object
                 # self.logger.update_obstacle_state(current_time, path.has_obstacle, sensor_data)

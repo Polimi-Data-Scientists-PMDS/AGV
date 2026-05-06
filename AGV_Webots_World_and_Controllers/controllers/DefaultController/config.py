@@ -8,6 +8,10 @@ PROJECT_ROOT = os.path.abspath(os.path.join(DEFAULT_CONTROLLER_DIR, "..", "..", 
 LOGGER_DIR = os.path.join(PROJECT_ROOT, "logging", "logger")
 LOGS_DIR = os.path.join(PROJECT_ROOT, "logging", "logs")
 
+# Dashboard selector. Keep False to launch the Streamlit dashboard in web-app/app.py.
+# Set True to launch the React dashboard in web-app/app.tsx.
+use_react = False
+
 @dataclass(frozen=True)
 class TaskConfig:
     # List of targets
@@ -117,7 +121,6 @@ class SectorPlanningConfig(PlanningConfig):
 class LogConfig:
     log_interval = 5.0      # s
     print_interval = 0.5    # s
-
 
 
 
