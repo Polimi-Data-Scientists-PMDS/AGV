@@ -11,7 +11,7 @@ body {
 
 .dashboard {
   box-sizing: border-box;
-  width: min(100%, 920px);
+  width: min(100%, 1560px);
   padding: 28px 28px 48px;
 }
 
@@ -40,6 +40,21 @@ body {
   margin-top: 0;
 }
 
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: minmax(420px, max-content) minmax(640px, 1fr);
+  align-items: start;
+  gap: 44px;
+}
+
+.dashboard-data {
+  min-width: 0;
+}
+
+.dashboard-visuals {
+  min-width: 0;
+}
+
 .dashboard-section h2 {
   margin: 0;
   font-size: 24px;
@@ -51,6 +66,168 @@ body {
   margin-top: 22px;
 }
 
+.map-shell {
+  width: 100%;
+  margin-top: 22px;
+}
+
+.live-map {
+  display: block;
+  width: 100%;
+  aspect-ratio: 69 / 22;
+  border: 1px solid #d6d8df;
+  background: #f7f8fb;
+}
+
+.map-background {
+  fill: #fbfcfd;
+}
+
+.map-grid line {
+  stroke: #dfe3ea;
+  stroke-width: 0.05;
+}
+
+.map-obstacles rect {
+  fill: #8e96a3;
+  opacity: 0.5;
+  stroke: #20242c;
+  stroke-width: 0.08;
+}
+
+.map-point text {
+  fill: #1f2430;
+  font-size: 1.2px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 0.2;
+}
+
+.map-point-dropoff rect {
+  fill: #1f8f4d;
+}
+
+.map-point-pickup circle {
+  fill: #286bd1;
+}
+
+.map-point-charging polygon {
+  fill: #fff200;
+  stroke: #b69300;
+  stroke-width: 0.12;
+  stroke-linejoin: round;
+}
+
+.map-goal line {
+  stroke: #7a2fb0;
+  stroke-width: 0.25;
+  stroke-linecap: round;
+}
+
+.map-robot circle {
+  fill: #d93636;
+  stroke: #1f2430;
+  stroke-width: 0.18;
+}
+
+.map-robot line {
+  stroke: #d93636;
+  stroke-width: 0.28;
+  stroke-linecap: round;
+}
+
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin-top: 12px;
+  color: #31333f;
+  font-size: 14px;
+}
+
+.map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.live-feed-sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  align-items: flex-start;
+  gap: 18px;
+  margin-top: 40px;
+}
+
+.live-feed-sections .dashboard-section {
+  min-width: 0;
+  margin-top: 0;
+}
+
+.live-feed-image {
+  display: block;
+  width: auto;
+  max-width: min(100%, 520px);
+  height: 300px;
+  margin-top: 22px;
+  border: 1px solid #d6d8df;
+  background: #f7f8fb;
+  object-fit: contain;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #252a34;
+}
+
+.legend-agv {
+  border-radius: 999px;
+  background: #d93636;
+}
+
+.legend-dropoff {
+  background: #1f8f4d;
+}
+
+.legend-pickup {
+  border-radius: 999px;
+  background: #286bd1;
+}
+
+.legend-charging {
+  background: #fff200;
+  border-color: #b69300;
+  clip-path: polygon(58% 0, 10% 54%, 45% 54%, 34% 100%, 92% 38%, 58% 38%);
+}
+
+.legend-goal {
+  position: relative;
+  border: 0;
+}
+
+.legend-goal::before,
+.legend-goal::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: 14px;
+  height: 2px;
+  background: #7a2fb0;
+}
+
+.legend-goal::before {
+  transform: rotate(45deg);
+}
+
+.legend-goal::after {
+  transform: rotate(-45deg);
+}
 
 .dashboard-section summary {
   display: flex;
@@ -140,6 +317,11 @@ body {
     font-size: 32px;
   }
 
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
   .dashboard-section h2 {
     font-size: 24px;
   }
@@ -165,5 +347,18 @@ body {
   .metric-value {
     margin-top: 10px;
     font-size: 34px;
+  }
+
+  .live-map {
+    aspect-ratio: 1 / 1;
+  }
+
+  .live-feed-sections {
+    grid-template-columns: 1fr;
+  }
+
+  .live-feed-image {
+    width: 100%;
+    height: auto;
   }
 }
