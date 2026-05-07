@@ -1,46 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { LiveMap } from "./LiveMap";
+import type { RobotData } from "./types";
 import "./App.css";
 
 type AppProps = { title?: string };
-
-type RobotData = {
-  time: number;
-  state: {
-    x: number;
-    y: number;
-    theta: number;
-  };
-  gps: {
-    x: number;
-    y: number;
-  };
-  errors: {
-    distance: number;
-    heading: number;
-  };
-  current_velocities: {
-    linear: number;
-    angular: number;
-  };
-  target_velocities: {
-    linear: number;
-    angular: number;
-  };
-  goal_position: {
-    x: number;
-    y: number;
-  };
-  next_point: {
-    x: number;
-    y: number;
-  } | null;
-};
 
 type MetricProps = {
   label: string;
   value: string;
   unit?: string;
 };
+
+type MetricSection = {
+  title: string;
+  rows: MetricProps[][];
+};
+
+const fmt = (value: number, digits = 2) => value.toFixed(digits);
+const pointMetric = (label: string, value?: number): MetricProps => ({
+  label,
+  value: value === undefined ? "N/A" : fmt(value),
+  unit: value === undefined ? undefined : "m",
+});
 
 function Metric({ label, value, unit }: MetricProps) {
   return (
@@ -70,7 +51,7 @@ function MetricRow({ metrics }: MetricRowProps) {
 
 type DashboardSectionProps = {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 function DashboardSection({ title, children }: DashboardSectionProps) {
@@ -84,106 +65,105 @@ function DashboardSection({ title, children }: DashboardSectionProps) {
   );
 }
 
+type LiveImageProps = {
+  alt: string;
+  src: string;
+  time: number;
+};
+
+function LiveImage({ alt, src, time }: LiveImageProps) {
+  return <img className="live-feed-image" src={`${src}?t=${time}`} alt={alt} />;
+}
+
+function buildMetricSections(data: RobotData): MetricSection[] {
+  const { current_velocities: current, errors, goal_position: goal, gps, next_point: next, state, target_velocities: target } = data;
+
+  return [
+    { title: "Runtime", rows: [[{ label: "Current Time", value: fmt(data.time), unit: "s" }]] },
+    {
+      title: "Targets",
+      rows: [
+        [pointMetric("Goal X", goal.x), pointMetric("Goal Y", goal.y)],
+        [pointMetric("Next Point X", next?.x), pointMetric("Next Point Y", next?.y)],
+      ],
+    },
+    {
+      title: "Coordinates",
+      rows: [
+        [
+          pointMetric("State X", state.x),
+          pointMetric("State Y", state.y),
+          { label: "State Theta", value: fmt(state.theta), unit: "rad" },
+        ],
+        [pointMetric("GPS X", gps.x), pointMetric("GPS Y", gps.y)],
+      ],
+    },
+    {
+      title: "Tracking Errors",
+      rows: [[{ label: "Distance Error", value: fmt(errors.distance, 4), unit: "m" }, { label: "Heading Error", value: fmt(errors.heading, 4), unit: "rad" }]],
+    },
+    {
+      title: "Velocities",
+      rows: [
+        [{ label: "Current Linear", value: fmt(current.linear), unit: "m/s" }, { label: "Current Angular", value: fmt(current.angular), unit: "rad/s" }],
+        [{ label: "Target Linear", value: fmt(target.linear), unit: "m/s" }, { label: "Target Angular", value: fmt(target.angular), unit: "rad/s" }],
+      ],
+    },
+  ];
+}
 
 export default function App({ title = "AGV Dashboard" }: AppProps) {
-    const [robotData, setRobotData] = useState<RobotData | null>(null);
+  const [robotData, setRobotData] = useState<RobotData | null>(null);
 
-    useEffect(() => {
-        async function loadRobotData() {
-            const response = await fetch("/api/realtime-panel")
-            const data: RobotData = await response.json();
-            setRobotData(data);
-        }
-
-        loadRobotData();
-        const intervalId = window.setInterval(loadRobotData, 300);
-
-        return () => window.clearInterval(intervalId);
-    }, []);
-
-    if (robotData === null) {
-        return (
-            <main className="dashboard">
-                <h1>{title}</h1>
-                <p className="loading-message">Loading robot data...</p>
-            </main>
-        );
+  useEffect(() => {
+    async function loadRobotData() {
+      const response = await fetch("/api/realtime-panel");
+      setRobotData(await response.json());
     }
 
+    loadRobotData();
+    const intervalId = window.setInterval(loadRobotData, 50);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  if (robotData === null) {
     return (
-        <main className="dashboard">
-            <h1>{title}</h1>
-            <DashboardSection title="Runtime">
-                <MetricRow
-                    metrics={[
-                        { label: "Current Time", value: robotData.time.toFixed(2), unit: "s" },
-                    ]}
-                />
-            </DashboardSection>
-
-            <DashboardSection title="Targets">
-                <MetricRow
-                    metrics={[
-                        { label: "Goal X", value: robotData.goal_position.x.toFixed(2), unit: "m" },
-                        { label: "Goal Y", value: robotData.goal_position.y.toFixed(2), unit: "m" },
-                    ]}
-                />
-                <MetricRow
-                    metrics={[
-                        { label: "Next Point X", value: robotData.next_point
-                            ? robotData.next_point.x.toFixed(2)
-                            : "N/A",
-                            unit: robotData.next_point ? "m" : undefined,
-                        },
-
-                        { label: "Next Point Y", value: robotData.next_point
-                            ? robotData.next_point.y.toFixed(2)
-                            : "N/A",
-                            unit: robotData.next_point ? "m" : undefined,
-                        },
-                    ]}
-                />
-            </DashboardSection>
-
-            <DashboardSection title="Coordinates">
-                <MetricRow
-                    metrics={[
-                        { label: "State X", value: robotData.state.x.toFixed(2), unit: "m" },
-                        { label: "State Y", value: robotData.state.y.toFixed(2), unit: "m" },
-                        { label: "State Theta", value: robotData.state.theta.toFixed(2), unit: "rad" },
-                    ]}
-                />
-                <MetricRow
-                    metrics={[
-                        { label: "GPS X", value: robotData.gps.x.toFixed(2), unit: "m" },
-                        { label: "GPS Y", value: robotData.gps.y.toFixed(2), unit: "m" },
-                    ]}
-                />
-            </DashboardSection>
-
-            <DashboardSection title="Tracking Errors">
-                <MetricRow
-                    metrics={[
-                        { label: "Distance Error", value: robotData.errors.distance.toFixed(4), unit: "m" },
-                        { label: "Heading Error", value: robotData.errors.heading.toFixed(4), unit: "rad" },
-                    ]}
-                />
-            </DashboardSection>
-
-            <DashboardSection title="Velocities">
-                <MetricRow
-                    metrics={[
-                        { label: "Current Linear", value: robotData.current_velocities.linear.toFixed(2), unit: "m/s" },
-                        { label: "Current Angular", value: robotData.current_velocities.angular.toFixed(2), unit: "rad/s" },
-                    ]}
-                />
-                <MetricRow
-                    metrics={[
-                        { label: "Target Linear", value: robotData.target_velocities.linear.toFixed(2), unit: "m/s" },
-                        { label: "Target Angular", value: robotData.target_velocities.angular.toFixed(2), unit: "rad/s" },
-                    ]}
-                />
-            </DashboardSection>
-        </main>
+      <main className="dashboard">
+        <h1>{title}</h1>
+        <p className="loading-message">Loading robot data...</p>
+      </main>
     );
+  }
+
+  return (
+    <main className="dashboard">
+      <h1>{title}</h1>
+      <div className="dashboard-layout">
+        <div className="dashboard-data">
+          {buildMetricSections(robotData).map(({ title, rows }) => (
+            <DashboardSection key={title} title={title}>
+              {rows.map((metrics, index) => <MetricRow key={index} metrics={metrics} />)}
+            </DashboardSection>
+          ))}
+        </div>
+
+        <div className="dashboard-visuals">
+          <DashboardSection title="Live Map">
+            <LiveMap data={robotData} />
+          </DashboardSection>
+
+          <div className="live-feed-sections">
+            <DashboardSection title="Live Local Planner Grid">
+              <LiveImage alt="Live local planner grid" src="/api/local-planner-grid" time={robotData.time} />
+            </DashboardSection>
+
+            <DashboardSection title="Robot AI Camera">
+              <LiveImage alt="Robot AI camera feed" src="/api/camera-feed" time={robotData.time} />
+            </DashboardSection>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
 }
