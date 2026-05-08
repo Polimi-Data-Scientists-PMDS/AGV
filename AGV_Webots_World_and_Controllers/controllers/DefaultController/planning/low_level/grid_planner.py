@@ -2,12 +2,13 @@ import numpy as np
 import cv2
 import heapq
 
-from planning.planning_interface import PlanningInterface, Path
+from planning.path import Path
+from planning.low_level.planning_interface import LowLevelPlanner
 from perception.perception import SensorData
 from localization.localization import RobotState, Position
 from config import GridPlanningConfig, LOGS_DIR
 
-class GridPlanner(PlanningInterface):
+class GridPlanner(LowLevelPlanner):
     def __init__(self, logger, lidar_specs):
         super().__init__(logger, lidar_specs)
 

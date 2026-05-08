@@ -3,6 +3,7 @@ import os
 import numpy as np
 from dataclasses import dataclass
 
+
 DEFAULT_CONTROLLER_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(DEFAULT_CONTROLLER_DIR, "..", "..", ".."))
 LOGGER_DIR = os.path.join(PROJECT_ROOT, "logging", "logger")
@@ -13,37 +14,40 @@ LOGS_DIR = os.path.join(PROJECT_ROOT, "logging", "logs")
 use_react = False
 
 @dataclass(frozen=True)
-class TaskConfig:
-    # List of targets
-    CHARGING_STATION = (6.75, -4.5)
-    DROPOFF_01 = (-29.3, 4)
-    PICKUP_01 = (-24, 3.5)
-    PICKUP_02 = (-18.5, 6.25)
-    PICKUP_03 = (-13.5, 6.25)
-    PICKUP_04 = (-8.25, 4.5)
-    PICKUP_05 = (-2, 5.75)
-    PICKUP_06 = (3.75, 5.75)
-    PICKUP_07 = (18.75, 2.25)
+class WorldConfig:
+    goals = {
+        "CHARGING_STATION": (6.75, -4.5),
+        "DROPOFF_01": (-29.3, 4),
+        "PICKUP_01": (-24, 3.5),
+        "PICKUP_02": (-18.5, 6.25),
+        "PICKUP_03": (-13.5, 6.25),
+        "PICKUP_04": (-8.25, 4.5),
+        "PICKUP_05": (-2, 5.75),
+        "PICKUP_06": (3.75, 5.75),
+        "PICKUP_07": (18.75, 2.25),
+    }
 
-    goal_positions = [
-        # PICKUP_07,          # Pickup point 7
-        # CHARGING_STATION,   # Charging station
-        DROPOFF_01,         # Dropoff point 01
-        PICKUP_03,          # Pickup point 3
-        PICKUP_04,          # Pickup point 4
-        CHARGING_STATION,   # Charging station
-        PICKUP_01,          # Pickup point 1
-        DROPOFF_01,         # Dropoff point 01
-        PICKUP_02,          # Pickup point 2
-        PICKUP_05,          # Pickup point 5
-        PICKUP_06,          # Pickup point 6
-        DROPOFF_01,         # Dropoff point 01
-        PICKUP_07,          # Pickup point 7
-        CHARGING_STATION,   # Charging station
+    # Fixed Obstacles (Work Islands & Walls) [center_x, center_y, width, height]
+    fixed_obstacles = [
+        [-24.94, 1.92, 1.2, 3],
+        [-19.22, 4, 1, 5],
+        [-14.18, 4, 1, 5],
+        [-9.34, 3.43, 1, 2],
+        [-9.34, 0.92, 3, 4],
+        [-2.71, 4, 1, 4],
+        [2.96, 4, 1, 4],
+        [26.36, -0.1, 12, 3],
+        [12.5, -1.08, 6, 2.5],
+        [0, 10.9, 69, 0.2],
+        [-13.65, -10.9, 41.75, 0.2],
+        [20.6, -2.8, 27.6, 0.2],
+        [-34.4, 0, 0.2, 21.94],
+        [34.4, 4.1, 0.2, 13.8],
+        [7.3, -2.45, 0.2, 17.1],
+        [-5.09814, -7.46193, 0.5, 7],
+        [-28.57, 0, 0.5, 14.71]
     ]
 
-@dataclass(frozen=True)
-class WorldConfig:
     dynamic_obstacles = [
         # Humans
         {"def_name": "HUMAN_1", "amplitude": -8.5, "speed": 1, "axis": 'y'},
@@ -61,6 +65,7 @@ class WorldConfig:
         {"def_name": "FORKLIFT_4", "amplitude": -12.0, "speed": 1.5, "axis": 'y'},
     ]
 
+
 @dataclass(frozen=True)
 class PhysicalConfig:
     wheel_base: float = 0.33            # (m)
@@ -73,7 +78,7 @@ class PerceptionConfig:
 
 @dataclass(frozen=True)
 class VisionConfig:
-    enable_object_detection = True
+    enable_object_detection = False
     yolo_model = "yolov8n.pt"
     yolo_thresh = 0.4
     
@@ -84,13 +89,28 @@ class ControlConfig:
     max_ang_vel = 1.0                   # (rad/s)
     ang_vel_deadzone = 0.05             # (rad/s)
     
+
 @dataclass(frozen=True)
 class PlanningConfig:
+    goal_reached_thresh = 1
+
+@dataclass(frozen=True)
+class HighLevelPlanningConfig(PlanningConfig):
+    goal_reached_thresh = 1
+    collision_distance = 0.25
+
+@dataclass(frozen=True)
+class VisGraphPlanningConfig(HighLevelPlanningConfig):
+    inflation = 0.8
+    change_goal_thresh = 1
+    
+@dataclass(frozen=True)
+class LowLevelPlanningConfig(PlanningConfig):
     goal_reached_thresh = 1
     collision_distance = 0.25
     
 @dataclass(frozen=True)
-class GridPlanningConfig(PlanningConfig):
+class GridPlanningConfig(LowLevelPlanningConfig):
     vision_distance = 10    # (m)
     padding_size = 0.8
     grid_res = 0.2         # (m)
@@ -109,7 +129,7 @@ class GridPlanningConfig(PlanningConfig):
     heuristic_weight = 2
 
 @dataclass(frozen=True)
-class SectorPlanningConfig(PlanningConfig):
+class SectorPlanningConfig(LowLevelPlanningConfig):
     num_sectors = 32
     padding = 3
     vision_distance = 2.0                # (m)
