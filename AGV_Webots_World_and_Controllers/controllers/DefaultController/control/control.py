@@ -1,7 +1,7 @@
 import numpy as np
 
 from localization.localization import RobotState
-from planning.planning_interface import Path
+from planning.low_level.planning_interface import Path
 from utils.utils import calculate_control_errors
 from config import ControlConfig, PhysicalConfig
 
