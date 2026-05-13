@@ -39,7 +39,7 @@ class RobotLog:
         self.db_user = os.getenv("DB_USER", "root")
         self.db_password = os.getenv("DB_PASSWORD", "agv_pass") # Updated to match your docker container
         self.db_name = os.getenv("DB_NAME", "agv_data")
-        self.sim_id = -1
+        self.sim_id = self._next_local_sim_id()
 
         conn = None
         cursor = None
@@ -81,6 +81,111 @@ class RobotLog:
             if conn is not None and conn.is_connected():
                 try: conn.close()
                 except Exception: pass
+
+
+        # Write the initial simulation line to the dashboard JSONL.
+        # Every subsequent save_to_database() call will overwrite this line in-place.
+        self._update_simulation_jsonl()
+
+    # Dashboard JSONL helpers (mirror of MySQL data for real-time dashboard display)
+
+    @property
+    def _jsonl_dir(self):
+        return os.path.dirname(self.log_file_path) or "."
+
+    def _next_local_sim_id(self):
+        #Use negative ids when MySQL does not create a simulation row.
+        path = os.path.join(self._jsonl_dir, "simulations.jsonl")
+        ids = []
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        sim_id = json.loads(line).get("id")
+                        if isinstance(sim_id, int):
+                            ids.append(sim_id)
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+
+        negative_ids = [sim_id for sim_id in ids if sim_id < 0]
+        return min(negative_ids, default=0) - 1
+
+    def _update_simulation_jsonl(self):
+    
+        #Overwrites the line for the current sim_id in simulations.jsonl.
+        #If no line exists yet for this sim_id (first call from __init__),
+        #a new line is appended. All previous simulation lines are preserved.
+        
+        record = {
+            "id": self.sim_id,
+            "controller_version": self.controller_version,
+            "total_sim_time": self._seconds_to_mysql_time(self.total_time),
+            "obstacle_count": self.obstacle_count,
+            "total_idle_time": self._seconds_to_mysql_time(self.idle_time),
+            "event_count": self.event_count,
+        }
+        path = os.path.join(self._jsonl_dir, "simulations.jsonl")
+        os.makedirs(self._jsonl_dir, exist_ok=True)
+
+        existing = []
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                existing = [json.loads(line) for line in f if line.strip()]
+        except FileNotFoundError:
+            pass
+
+        replaced = False
+        for i, row in enumerate(existing):
+            if row.get("id") == self.sim_id:
+                existing[i] = record
+                replaced = True
+                break
+        if not replaced:
+            existing.append(record)
+
+        with open(path, "w", encoding="utf-8") as f:
+            for row in existing:
+                f.write(json.dumps(row) + "\n")
+
+    def _append_event_jsonl(self, sim_id, sim_time, event_type, details):
+        #Appends one event line to events.jsonl immediately when the event is logged.
+        path = os.path.join(self._jsonl_dir, "events.jsonl")
+        os.makedirs(self._jsonl_dir, exist_ok=True)
+        record = {
+            "sim_id": sim_id,
+            "sim_time": self._seconds_to_mysql_time(sim_time),
+            "e_type": event_type,
+            "details": details,
+        }
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+
+    def _append_telemetry_jsonl(self, row):
+        #Appends one telemetry line to event_telemetry.jsonl immediately when the event is logged.
+        (
+            sim_id, event_time, event_type,
+            state_x, state_y, state_theta,
+            gps_x, gps_y,
+            error_distance, error_heading,
+            current_vel_linear, current_vel_angular,
+            target_vel_linear, target_vel_angular,
+            next_point_x, next_point_y,
+        ) = row
+        path = os.path.join(self._jsonl_dir, "event_telemetry.jsonl")
+        os.makedirs(self._jsonl_dir, exist_ok=True)
+        record = {
+            "sim_id": sim_id,
+            "event_time": self._seconds_to_mysql_time(event_time),
+            "e_type": event_type,
+            "state_x": state_x, "state_y": state_y, "state_theta": state_theta,
+            "gps_x": gps_x, "gps_y": gps_y,
+            "error_distance": error_distance, "error_heading": error_heading,
+            "current_vel_linear": current_vel_linear, "current_vel_angular": current_vel_angular,
+            "target_vel_linear": target_vel_linear, "target_vel_angular": target_vel_angular,
+            "next_point_x": next_point_x, "next_point_y": next_point_y,
+        }
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
 
     @staticmethod
     def _seconds_to_mysql_time(seconds):
@@ -140,9 +245,14 @@ class RobotLog:
             data.get("next_point", {}).get("x") if data.get("next_point") else None,
             data.get("next_point", {}).get("y") if data.get("next_point") else None,
         )
-    
+
         self.event_telemetry.append(x)
-        
+
+        # Write to dashboard JSONLs immediately so the dashboard can reflect the new event and telemetry in real-time
+        self._append_event_jsonl(self.sim_id, sim_time, event_type, details)
+        self._append_telemetry_jsonl(x)
+        self._update_simulation_jsonl()
+
     def log_target_reached(self, sim_time, target_index=None, target=None):
         details = "target reached"
         if target_index is not None:
@@ -190,7 +300,7 @@ class RobotLog:
 
         self.last_time = current_time
 
-    # TODO: remove this method after datbase integration is verified working, as we will be saving directly to the database instead of a JSONL file
+    # TODO: remove this method after database integration is verified working, as we will be saving directly to the database instead of a JSONL file
     def save(self):
         log_dir = os.path.dirname(self.log_file_path)
         if log_dir:
@@ -218,6 +328,8 @@ class RobotLog:
         """
         Updates the simulation summary and batch-saves in-memory events
         and event telemetry records to MySQL.
+        Also overwrites the current simulation line in simulations.jsonl
+        so the dashboard always reflects the latest state.
         """
 
         conn = None
@@ -278,7 +390,7 @@ class RobotLog:
                     gps_x, gps_y,
                     error_distance, error_heading,
                     current_vel_linear, current_vel_angular,
-                    target_vel_linear,target_vel_angular,
+                    target_vel_linear, target_vel_angular,
                     next_point_x, next_point_y
                 )
                 in self.event_telemetry
@@ -322,4 +434,6 @@ class RobotLog:
             if conn is not None and conn.is_connected():
                 try: conn.close()
                 except Exception: pass
-            
+
+        # Mirror the updated simulation summary to the dashboard JSONL.
+        self._update_simulation_jsonl()

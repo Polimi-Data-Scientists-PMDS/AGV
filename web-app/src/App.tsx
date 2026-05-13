@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { LiveMap } from "./LiveMap";
+import SimulationTable from "./SimulationTable";
 import type { RobotData } from "./types";
 import "./App.css";
 
@@ -139,6 +140,8 @@ export default function App({ title = "AGV Dashboard" }: AppProps) {
   return (
     <main className="dashboard">
       <h1>{title}</h1>
+
+      {/* Live metrics, map, and camera feeds */}
       <div className="dashboard-layout">
         <div className="dashboard-data">
           {buildMetricSections(robotData).map(({ title, rows }) => (
@@ -164,6 +167,11 @@ export default function App({ title = "AGV Dashboard" }: AppProps) {
           </div>
         </div>
       </div>
+
+      {/* Simulation history tables*/}
+      <DashboardSection title="Simulation Log">
+        <SimulationTable />
+      </DashboardSection>
     </main>
   );
 }
