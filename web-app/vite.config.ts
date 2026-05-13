@@ -3,12 +3,14 @@ import react from "@vitejs/plugin-react";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const realtimePanelPath = path.resolve(
-  __dirname,
-  "../logging/logs/robot_controller_runs_realtime_panel.jsonl",
-);
-const localPlannerGridPath = path.resolve(__dirname, "../logging/logs/local_planner_grid.jpg");
-const cameraFeedPath = path.resolve(__dirname, "../logging/logs/camera_feed.jpg");
+const logsDir = path.resolve(__dirname, "../logging/logs");
+
+const realtimePanelPath  = path.join(logsDir, "robot_controller_runs_realtime_panel.jsonl");
+const localPlannerGridPath = path.join(logsDir, "local_planner_grid.jpg");
+const cameraFeedPath     = path.join(logsDir, "camera_feed.jpg");
+const simulationsPath    = path.join(logsDir, "simulations.jsonl");
+const eventsPath         = path.join(logsDir, "events.jsonl");
+const eventTelemetryPath = path.join(logsDir, "event_telemetry.jsonl");
 
 async function serveJpeg(pathname: string, res: { statusCode: number; setHeader: (name: string, value: string) => void; end: (chunk?: string | Buffer) => void }) {
   try {
@@ -19,6 +21,18 @@ async function serveJpeg(pathname: string, res: { statusCode: number; setHeader:
   } catch {
     res.statusCode = 404;
     res.end("Image not found");
+  }
+}
+
+async function serveJsonLines(pathname: string, res: { statusCode: number; setHeader: (name: string, value: string) => void; end: (chunk?: string) => void }) {
+  try {
+    const text = await fs.readFile(pathname, "utf-8");
+    res.setHeader("Content-Type", "application/x-ndjson");
+    res.setHeader("Cache-Control", "no-store");
+    res.end(text);
+  } catch {
+    res.statusCode = 404;
+    res.end("");
   }
 }
 
@@ -47,6 +61,18 @@ export default defineConfig({
 
         server.middlewares.use("/api/camera-feed", async (_req, res) => {
           await serveJpeg(cameraFeedPath, res);
+        });
+
+        server.middlewares.use("/api/simulations", async (_req, res) => {
+          await serveJsonLines(simulationsPath, res);
+        });
+
+        server.middlewares.use("/api/events", async (_req, res) => {
+          await serveJsonLines(eventsPath, res);
+        });
+
+        server.middlewares.use("/api/event-telemetry", async (_req, res) => {
+          await serveJsonLines(eventTelemetryPath, res);
         });
       },
     },

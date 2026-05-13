@@ -40,6 +40,10 @@ body {
   margin-top: 0;
 }
 
+.dashboard-layout + .dashboard-section {
+  margin-top: 56px;
+}
+
 .dashboard-layout {
   display: grid;
   grid-template-columns: minmax(420px, max-content) minmax(640px, 1fr);
@@ -55,11 +59,48 @@ body {
   min-width: 0;
 }
 
-.dashboard-section h2 {
+.dashboard-section > summary h2 {
   margin: 0;
   font-size: 24px;
   font-weight: 700;
-  line-height: 7px;
+  line-height: 1.2;
+}
+
+.simulation-table-section {
+  margin-top: 32px;
+}
+
+.simulation-table-section summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.simulation-table-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.simulation-table-section summary::before {
+  content: ">";
+  display: inline-block;
+  width: 14px;
+  color: #566174;
+  font-weight: 700;
+}
+
+.simulation-table-section[open] summary::before {
+  content: "v";
+}
+
+.simulation-table-section h2 {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.simulation-table-section[open] h2 {
+  margin-bottom: 12px;
 }
 
 .dashboard-section > .metric-row {
