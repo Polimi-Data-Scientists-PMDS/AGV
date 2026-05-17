@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
+import { initialGoalPoints, loadGoalsConfig, moveGoal, saveGoalsConfig, type GoalPoint, type MoveDirection } from "./goals";
 import { LiveMap } from "./LiveMap";
 import SimulationTable from "./SimulationTable";
 import type { RobotData } from "./types";
@@ -66,6 +67,68 @@ function DashboardSection({ title, children }: DashboardSectionProps) {
   );
 }
 
+type GoalOrderProps = {
+  goals: GoalPoint[];
+  selectedGoalName: string | null;
+  saveStatus: string;
+  onMoveGoal: (goalName: string, direction: MoveDirection) => void;
+  onSelectGoal: (goalName: string) => void;
+};
+
+function GoalOrder({ goals, selectedGoalName, saveStatus, onMoveGoal, onSelectGoal }: GoalOrderProps) {
+  function handleKeyDown(event: KeyboardEvent<HTMLOListElement>) {
+    if (selectedGoalName === null || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) {
+      return;
+    }
+
+    event.preventDefault();
+    onMoveGoal(selectedGoalName, event.key === "ArrowUp" ? -1 : 1);
+  }
+
+  return (
+    <ol className="goal-order-list" tabIndex={0} onKeyDown={handleKeyDown}>
+      {goals.map(({ name, coordinates }, index) => (
+        <li key={name} className="goal-order-item">
+          <button
+            type="button"
+            className="goal-order-select"
+            aria-pressed={selectedGoalName === name}
+            onClick={() => onSelectGoal(name)}
+          >
+            <span className="goal-order-index">{index + 1}</span>
+            <span className="goal-order-name">{name}</span>
+            <span className="goal-order-coordinates">
+              x {fmt(coordinates[0])}, y {fmt(coordinates[1])}
+            </span>
+          </button>
+
+          <span className="goal-order-actions">
+            <button
+              type="button"
+              className="goal-order-action"
+              aria-label={`Move ${name} up`}
+              disabled={index === 0}
+              onClick={() => onMoveGoal(name, -1)}
+            >
+              ^
+            </button>
+            <button
+              type="button"
+              className="goal-order-action"
+              aria-label={`Move ${name} down`}
+              disabled={index === goals.length - 1}
+              onClick={() => onMoveGoal(name, 1)}
+            >
+              v
+            </button>
+          </span>
+        </li>
+      ))}
+      <li className="goal-order-status">{saveStatus}</li>
+    </ol>
+  );
+}
+
 type LiveImageProps = {
   alt: string;
   src: string;
@@ -115,6 +178,9 @@ function buildMetricSections(data: RobotData): MetricSection[] {
 
 export default function App({ title = "AGV Dashboard" }: AppProps) {
   const [robotData, setRobotData] = useState<RobotData | null>(null);
+  const [goalOrder, setGoalOrder] = useState<GoalPoint[]>(initialGoalPoints);
+  const [selectedGoalName, setSelectedGoalName] = useState<string | null>(initialGoalPoints[0]?.name ?? null);
+  const [goalsSaveStatus, setGoalsSaveStatus] = useState("Saved");
 
   useEffect(() => {
     async function loadRobotData() {
@@ -127,6 +193,36 @@ export default function App({ title = "AGV Dashboard" }: AppProps) {
 
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    async function loadGoalOrder() {
+      try {
+        const config = await loadGoalsConfig();
+        setGoalOrder(config.Goals);
+        setSelectedGoalName((currentSelection) => currentSelection ?? config.Goals[0]?.name ?? null);
+      } catch {
+        setGoalsSaveStatus("Using local goal order");
+      }
+    }
+
+    loadGoalOrder();
+  }, []);
+
+  function handleMoveGoal(goalName: string, direction: MoveDirection) {
+    setSelectedGoalName(goalName);
+    setGoalOrder((currentGoalOrder) => {
+      const nextGoalOrder = moveGoal(currentGoalOrder, goalName, direction);
+
+      if (nextGoalOrder !== currentGoalOrder) {
+        setGoalsSaveStatus("Saving...");
+        saveGoalsConfig(nextGoalOrder)
+          .then(() => setGoalsSaveStatus("Saved"))
+          .catch(() => setGoalsSaveStatus("Save failed"));
+      }
+
+      return nextGoalOrder;
+    });
+  }
 
   if (robotData === null) {
     return (
@@ -149,6 +245,16 @@ export default function App({ title = "AGV Dashboard" }: AppProps) {
               {rows.map((metrics, index) => <MetricRow key={index} metrics={metrics} />)}
             </DashboardSection>
           ))}
+
+          <DashboardSection title="Goal Order">
+            <GoalOrder
+              goals={goalOrder}
+              selectedGoalName={selectedGoalName}
+              saveStatus={goalsSaveStatus}
+              onMoveGoal={handleMoveGoal}
+              onSelectGoal={setSelectedGoalName}
+            />
+          </DashboardSection>
         </div>
 
         <div className="dashboard-visuals">

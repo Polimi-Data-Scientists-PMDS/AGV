@@ -11,6 +11,57 @@ const cameraFeedPath     = path.join(logsDir, "camera_feed.jpg");
 const simulationsPath    = path.join(logsDir, "simulations.jsonl");
 const eventsPath         = path.join(logsDir, "events.jsonl");
 const eventTelemetryPath = path.join(logsDir, "event_telemetry.jsonl");
+const goalsConfigPath    = path.resolve(__dirname, "src/goals.config.json");
+
+type GoalPoint = {
+  name: string;
+  coordinates: [number, number];
+};
+
+type GoalsConfig = {
+  Goals: GoalPoint[];
+};
+
+function isGoalPoint(value: unknown): value is GoalPoint {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const goal = value as { name?: unknown; coordinates?: unknown };
+  return (
+    typeof goal.name === "string" &&
+    Array.isArray(goal.coordinates) &&
+    goal.coordinates.length === 2 &&
+    goal.coordinates.every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate))
+  );
+}
+
+function isGoalsConfig(value: unknown): value is GoalsConfig {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const config = value as { Goals?: unknown };
+  return Array.isArray(config.Goals) && config.Goals.length > 0 && config.Goals.every(isGoalPoint);
+}
+
+function readRequestBody(req: NodeJS.ReadableStream): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.setEncoding("utf-8");
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+    req.on("end", () => resolve(body));
+    req.on("error", reject);
+  });
+}
+
+async function writeGoalsConfig(config: GoalsConfig) {
+  const tempPath = `${goalsConfigPath}.tmp`;
+  await fs.writeFile(tempPath, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
+  await fs.rename(tempPath, goalsConfigPath);
+}
 
 async function serveJpeg(pathname: string, res: { statusCode: number; setHeader: (name: string, value: string) => void; end: (chunk?: string | Buffer) => void }) {
   try {
@@ -53,6 +104,45 @@ export default defineConfig({
             res.statusCode = 404;
             res.end(JSON.stringify({ error: "No realtime panel data found" }));
           }
+        });
+
+        server.middlewares.use("/api/goals", async (req, res) => {
+          if (req.method === "GET") {
+            try {
+              const text = await fs.readFile(goalsConfigPath, "utf-8");
+              res.setHeader("Content-Type", "application/json");
+              res.setHeader("Cache-Control", "no-store");
+              res.end(text);
+            } catch {
+              res.statusCode = 404;
+              res.end(JSON.stringify({ error: "No goals config found" }));
+            }
+            return;
+          }
+
+          if (req.method === "PUT") {
+            try {
+              const body = await readRequestBody(req);
+              const config = JSON.parse(body);
+
+              if (!isGoalsConfig(config)) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: "Invalid goals config" }));
+                return;
+              }
+
+              await writeGoalsConfig(config);
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify(config));
+            } catch {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: "Could not save goals config" }));
+            }
+            return;
+          }
+
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: "Method not allowed" }));
         });
 
         server.middlewares.use("/api/local-planner-grid", async (_req, res) => {

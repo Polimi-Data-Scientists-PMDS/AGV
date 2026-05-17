@@ -59,6 +59,12 @@ cd web-app
 npm install
 ```
 
+To open the web app, run: 
+```bash
+cd web-app
+npm run dev
+```
+
 ---
 
 ## Webots Configuration

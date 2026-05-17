@@ -1,5 +1,6 @@
 # React
 web-app/node_modules/
+goals.config.json
 
 # RobotLog trash
 logging/logs/*

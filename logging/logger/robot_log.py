@@ -419,6 +419,7 @@ class RobotLog:
                 self.event_count,
                 self.sim_id
             ))
+            
             conn.commit()
             print("Successfully saved simulation summary to the database.")
 
@@ -437,8 +438,10 @@ class RobotLog:
             cursor.executemany(insert_query_events_telemetry, db_event_telemetry)
             conn.commit()
             print(f"Successfully saved {len(self.event_telemetry)} event telemetry records to the database.")
-            self.event_telemetry = []  
+            self.event_telemetry = []
             print("Cleared event telemetry after saving to database.")
+
+            v = ""
 
         except Exception as e:
             print(f"Failed to save {v} to database: {e}")
@@ -450,3 +453,11 @@ class RobotLog:
             if conn is not None and conn.is_connected():
                 try: conn.close()
                 except Exception: pass
+            if v == "events" or v == "simulation summary":
+                self.events = []
+                print("Cleared events after saving to jsonl file.")
+                self.event_telemetry = []
+                print("Cleared event telemetry after saving to jsonl file.")
+            if v == "event telemetry":
+                self.event_telemetry = []
+                print("Cleared event telemetry after saving to jsonl file.")
