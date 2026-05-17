@@ -107,6 +107,116 @@ body {
   margin-top: 22px;
 }
 
+.goal-order-list {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 500px);
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.goal-order-list:focus {
+  outline: 2px solid #286bd1;
+  outline-offset: 4px;
+}
+
+.goal-order-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  border-bottom: 1px solid #d6d8df;
+  color: #31333f;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.goal-order-select {
+  display: grid;
+  grid-template-columns: 32px minmax(150px, 1fr) minmax(112px, auto);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.goal-order-select[aria-pressed="true"] .goal-order-index {
+  border-color: #286bd1;
+  background: #286bd1;
+  color: #ffffff;
+}
+
+.goal-order-select[aria-pressed="true"] .goal-order-name {
+  color: #1f4f9f;
+}
+
+.goal-order-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #b8bbc5;
+  border-radius: 999px;
+  color: #566174;
+  font-weight: 700;
+}
+
+.goal-order-name {
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.goal-order-coordinates {
+  color: #566174;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.goal-order-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.goal-order-status {
+  color: #566174;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.goal-order-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #b8bbc5;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #31333f;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.goal-order-action:disabled {
+  color: #b8bbc5;
+  cursor: default;
+}
+
 .map-shell {
   width: 100%;
   margin-top: 22px;
@@ -401,5 +511,25 @@ body {
   .live-feed-image {
     width: 100%;
     height: auto;
+  }
+
+  .goal-order-item {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+
+  .goal-order-select {
+    grid-template-columns: 32px 1fr;
+  }
+
+  .goal-order-coordinates {
+    grid-column: 2;
+    text-align: left;
+  }
+
+  .goal-order-actions {
+    justify-content: flex-start;
+    padding-left: 44px;
   }
 }

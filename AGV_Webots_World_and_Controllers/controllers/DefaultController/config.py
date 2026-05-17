@@ -1,46 +1,40 @@
 # config.py
+import json
 import os
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 DEFAULT_CONTROLLER_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(DEFAULT_CONTROLLER_DIR, "..", "..", ".."))
 LOGGER_DIR = os.path.join(PROJECT_ROOT, "logging", "logger")
 LOGS_DIR = os.path.join(PROJECT_ROOT, "logging", "logs")
+CONFIG_PATH = os.path.join(DEFAULT_CONTROLLER_DIR, "config.json")
+GOALS_CONFIG_PATH = os.path.join(PROJECT_ROOT, "web-app", "src", "goals.config.json")
 
 # Dashboard selector. Keep False to launch the Streamlit dashboard in web-app/app.py.
 # Set True to launch the React dashboard in web-app/app.tsx.
 use_react = False
 
+def _load_json_config(config_path):
+    with open(config_path, "r", encoding="utf-8") as config_file:
+        config = json.load(config_file)
+    return config
+
+def _load_goals_config():
+    if os.path.exists(GOALS_CONFIG_PATH):
+        return _load_json_config(GOALS_CONFIG_PATH)
+    return _load_json_config(CONFIG_PATH)
+
+def _load_goal_positions():
+    config = _load_goals_config()
+    return tuple(tuple(goal["coordinates"]) for goal in config["Goals"])
+
 @dataclass(frozen=True)
 class TaskConfig:
-    # List of targets
-    CHARGING_STATION = (6.75, -4.5)
-    DROPOFF_01 = (-29.3, 4)
-    PICKUP_01 = (-24, 3.5)
-    PICKUP_02 = (-18.5, 6.25)
-    PICKUP_03 = (-13.5, 6.25)
-    PICKUP_04 = (-8.25, 4.5)
-    PICKUP_05 = (-2, 5.75)
-    PICKUP_06 = (3.75, 5.75)
-    PICKUP_07 = (18.75, 2.25)
+    goal_positions: tuple = field(default_factory=_load_goal_positions)
 
-    goal_positions = [
-        # PICKUP_07,          # Pickup point 7
-        # CHARGING_STATION,   # Charging station
-        DROPOFF_01,         # Dropoff point 01
-        PICKUP_03,          # Pickup point 3
-        PICKUP_04,          # Pickup point 4
-        CHARGING_STATION,   # Charging station
-        PICKUP_01,          # Pickup point 1
-        DROPOFF_01,         # Dropoff point 01
-        PICKUP_02,          # Pickup point 2
-        PICKUP_05,          # Pickup point 5
-        PICKUP_06,          # Pickup point 6
-        DROPOFF_01,         # Dropoff point 01
-        PICKUP_07,          # Pickup point 7
-        CHARGING_STATION,   # Charging station
-    ]
+    def refresh_goal_positions(self):
+        object.__setattr__(self, "goal_positions", _load_goal_positions())
 
 @dataclass(frozen=True)
 class WorldConfig:
@@ -121,9 +115,6 @@ class SectorPlanningConfig(PlanningConfig):
 class LogConfig:
     log_interval = 5.0      # s
     print_interval = 0.5    # s
-
-
-
 
 
 
