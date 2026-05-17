@@ -62,6 +62,7 @@ class AGVSimulation:
 
             while self.hardware.is_alive():
                 current_time = self.hardware.get_time()
+                self.__refresh_goal_positions()
                 
                 # --- UPDATE ENVIRONMENT ---
                 self.environment.update_all(current_time)
@@ -124,22 +125,29 @@ class AGVSimulation:
     def __get_updated_goal(self, current_time, state):
         """Checks distance to goal and loads the next one if reached."""
         # Calculate using the state from the PREVIOUS simulation tick
-        goal = Position(*self.task_config.goal_positions[self.goal_index])
+        goal_positions = self.task_config.goal_positions
+        goal = Position(*goal_positions[self.goal_index])
         dist_e, heading_e = calculate_control_errors(state, goal)
         
         if dist_e < self.planning_config.goal_reached_thresh:
             self.logger.log_target_reached(
                 current_time, 
                 target_index=self.goal_index, 
-                target=self.task_config.goal_positions[self.goal_index]
+                target=goal_positions[self.goal_index]
             )
             print("GOAL REACHED!")
             
             # Load next goal
-            self.goal_index = (self.goal_index + 1) % len(self.task_config.goal_positions)
-            goal = Position(*self.task_config.goal_positions[self.goal_index])
+            self.goal_index = (self.goal_index + 1) % len(goal_positions)
+            goal = Position(*goal_positions[self.goal_index])
         
         return goal
+
+    def __refresh_goal_positions(self):
+        self.task_config.refresh_goal_positions()
+        if len(self.task_config.goal_positions) == 0:
+            raise ValueError("No goals configured in config.json")
+        self.goal_index %= len(self.task_config.goal_positions)
 
     def __should_save_to_database(self, current_time):
         return current_time - self.last_db_save >= self.log_config.log_interval
