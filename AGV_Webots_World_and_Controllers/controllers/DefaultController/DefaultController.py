@@ -121,6 +121,55 @@ class AGVSimulation:
             self.logger.save_to_database()
             print("Log saved to database successfully!")
 
+            goals_config_path = os.path.join(
+                os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")),
+                "web-app",
+                "src",
+                "goals.config.json",
+            )
+            with open(goals_config_path, "w", encoding="utf-8") as goals_config_file:
+                goals_config_file.write("""{
+    "Goals": [
+        {
+            "name": "CHARGING_STATION",
+            "coordinates": [6.75, -4.5]
+        },
+        {
+            "name": "DROPOFF_01",
+            "coordinates": [-29.3, 4]
+        },
+        {
+            "name": "PICKUP_01",
+            "coordinates": [-24, 3.5]
+        },
+        {
+            "name": "PICKUP_02",
+            "coordinates": [-18.5, 6.25]
+        },
+        {
+            "name": "PICKUP_03",
+            "coordinates": [-13.5, 6.25]
+        },
+        {
+            "name": "PICKUP_04",
+            "coordinates": [-8.25, 4.5]
+        },
+        {
+            "name": "PICKUP_05",
+            "coordinates": [-2, 5.75]
+        },
+        {
+            "name": "PICKUP_06",
+            "coordinates": [3.75, 5.75]
+        },
+        {
+            "name": "PICKUP_07",
+            "coordinates": [18.75, 2.25]
+        }
+    ]
+}
+""")
+
     def __init_logger(self):
         """Initializes and starts the custom RobotLog."""
         log_file_path = os.path.join(LOGS_DIR, "robot_controller_runs.jsonl")
