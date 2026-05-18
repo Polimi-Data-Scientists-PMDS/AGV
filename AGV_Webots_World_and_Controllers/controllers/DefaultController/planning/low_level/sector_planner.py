@@ -1,7 +1,8 @@
 # navigation/obstacle_avoidance.py
 import numpy as np
 
-from planning.planning_interface import PlanningInterface, Path
+from planning.path import Path
+from planning.low_level.planning_interface import LowLevelPlanner
 from perception.perception import SensorData
 from localization.localization import RobotState, Position
 from utils.utils import calculate_control_errors
@@ -9,7 +10,7 @@ from utils.utils import calculate_control_errors
 from config import SectorPlanningConfig
 
 
-class SectorPlanner(PlanningInterface):
+class SectorPlanner(LowLevelPlanner):
     def __init__(self, logger, lidar_specs):
         super().__init__(logger, lidar_specs)
 
