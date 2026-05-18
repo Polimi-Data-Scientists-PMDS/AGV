@@ -9,8 +9,6 @@ DEFAULT_CONTROLLER_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(DEFAULT_CONTROLLER_DIR, "..", "..", ".."))
 LOGGER_DIR = os.path.join(PROJECT_ROOT, "logging", "logger")
 LOGS_DIR = os.path.join(PROJECT_ROOT, "logging", "logs")
-CONFIG_PATH = os.path.join(DEFAULT_CONTROLLER_DIR, "config.json")
-GOALS_CONFIG_PATH = os.path.join(PROJECT_ROOT, "web-app", "src", "goals.config.json")
 
 @dataclass(frozen=True)
 class WorldConfig:
