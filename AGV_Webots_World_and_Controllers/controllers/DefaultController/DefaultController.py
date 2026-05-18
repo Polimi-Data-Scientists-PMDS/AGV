@@ -1,7 +1,8 @@
 import os
 import sys
 
-from config import TaskConfig, PlanningConfig, LogConfig, LOGGER_DIR, LOGS_DIR, use_react
+from config import PlanningConfig, LogConfig, LOGGER_DIR, LOGS_DIR
+from task import Task
 
 if LOGGER_DIR not in sys.path:
     sys.path.append(LOGGER_DIR)
@@ -10,9 +11,12 @@ from hardware.hardware_interface import HardwareInterface
 from hardware.webots_interface import WebotsInterface
 from perception.perception import Perception, SensorData
 from localization.localization import Localization, Position, RobotState
-# from planning.sector_planner import SectorPlanner
-from planning.planning_interface import PlanningInterface
-from planning.grid_planner import GridPlanner, Path
+
+
+from planning.path import Path
+from planning.high_level.planning_interface import HighLevelPlanner
+from planning.low_level.planning_interface import LowLevelPlanner
+
 from control.control import Control, ControlCommand
 
 from webots.dynamic_environment import DynamicEnvironment
@@ -27,7 +31,7 @@ from robot_log import RobotLog
 class AGVSimulation:
     def __init__(self):
         # Configuration & Hardware
-        self.task_config = TaskConfig()
+        self.task = Task()
         self.planning_config = PlanningConfig()
         self.log_config = LogConfig()
 
@@ -37,7 +41,8 @@ class AGVSimulation:
         self.logger:        RobotLog            = self.__init_logger()
         self.perception:    Perception          = Perception(self.hardware)
         self.localization:  Localization        = Localization()
-        self.planning:      PlanningInterface   = GridPlanner(self.logger, self.hardware.lidar.get_specs())
+        self.hl_planning:   HighLevelPlanner    = Task.hl_planner_class(self.logger)
+        self.ll_planning:   LowLevelPlanner     = Task.ll_planner_class(self.logger, self.hardware.lidar.get_specs())
         self.control:       Control             = Control()
 
         # Environment
@@ -62,7 +67,6 @@ class AGVSimulation:
 
             while self.hardware.is_alive():
                 current_time = self.hardware.get_time()
-                self.__refresh_goal_positions()
                 
                 # --- UPDATE ENVIRONMENT ---
                 self.environment.update_all(current_time)
@@ -77,10 +81,12 @@ class AGVSimulation:
 
                 # --- 3. PLANNING ---
                 goal: Position = self.__get_updated_goal(current_time, state)
-                path: Path = self.planning.plan(state, goal, sensor_data)
+                hl_path: Path = self.hl_planning.plan(state, goal)
+                ll_goal = hl_path.waypoints[0]
+                ll_path: Path = self.ll_planning.plan(state, ll_goal, sensor_data)
 
                 # --- 4. CONTROL ---
-                command: ControlCommand = self.control.follow_path(state, path)
+                command: ControlCommand = self.control.follow_path(state, ll_path)
                 
                 # --- 5. ACTUATION ---
                 self.hardware.motors.apply_command(command)
@@ -89,10 +95,10 @@ class AGVSimulation:
 
                 # --- PRINT AND LOG  ---
                 if self.__should_print_and_log(current_time):
-                    self.__print_and_log_data(current_time, sensor_data, state, goal, path, command)
+                    self.__print_and_log_data(current_time, sensor_data, state, goal, ll_path, command)
                     self.last_print_time = current_time
                 else: 
-                    self.logger.log_realtime(sensor_data, state, goal, command, path.waypoints[0] if len(path.waypoints) > 0 else None) 
+                    self.logger.log_realtime(sensor_data, state, goal, command, ll_path.waypoints[0] if len(ll_path.waypoints) > 0 else None) 
                 # --- UPDATE LOGGGER STATE  ---
                 # TODO: add `has_obstacle` to the path object
                 # self.logger.update_obstacle_state(current_time, path.has_obstacle, sensor_data)
@@ -125,29 +131,22 @@ class AGVSimulation:
     def __get_updated_goal(self, current_time, state):
         """Checks distance to goal and loads the next one if reached."""
         # Calculate using the state from the PREVIOUS simulation tick
-        goal_positions = self.task_config.goal_positions
-        goal = Position(*goal_positions[self.goal_index])
+        goal = Position(*self.task.get_goal(self.goal_index))
         dist_e, heading_e = calculate_control_errors(state, goal)
         
         if dist_e < self.planning_config.goal_reached_thresh:
             self.logger.log_target_reached(
                 current_time, 
                 target_index=self.goal_index, 
-                target=goal_positions[self.goal_index]
+                target=self.task.get_goal(self.goal_index)
             )
             print("GOAL REACHED!")
             
             # Load next goal
-            self.goal_index = (self.goal_index + 1) % len(goal_positions)
-            goal = Position(*goal_positions[self.goal_index])
+            self.goal_index = (self.goal_index + 1) % self.task.num_goals()
+            goal = Position(*self.task.get_goal(self.goal_index))
         
         return goal
-
-    def __refresh_goal_positions(self):
-        self.task_config.refresh_goal_positions()
-        if len(self.task_config.goal_positions) == 0:
-            raise ValueError("No goals configured in config.json")
-        self.goal_index %= len(self.task_config.goal_positions)
 
     def __should_save_to_database(self, current_time):
         return current_time - self.last_db_save >= self.log_config.log_interval
@@ -180,36 +179,6 @@ class AGVSimulation:
         # # print(f"\nRobot velocities:\n  Linear : {lin_vel:.2f} m/s\n  Angular: {ang_vel:.2f} rad/s")
         # print("="*40)
 
-def launch_dashboard():
-    import socket
-    import subprocess
-    import os
-    import sys
-    import webbrowser
-    import urllib.request
-
-    dashboard_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "web-app", "app.py"))
-    
-    # Check if port 8501 is in use
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        in_use = s.connect_ex(('localhost', 8501)) == 0
-        
-    if not in_use:
-        print("Starting Streamlit Dashboard on port 8501...")
-        # Streamlit automatically opens a browser tab when it first runs
-        subprocess.Popen([sys.executable, "-m", "streamlit", "run", dashboard_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    else:
-        print("Dashboard appears to be running on port 8501. Opening browser...")
-        
-        # Verify it's actually responding, then open the browser window
-        try:
-            urllib.request.urlopen("http://localhost:8501/_stcore/health", timeout=2)
-            webbrowser.open("http://localhost:8501")
-        except Exception:
-            # Even if health check fails, open it just in case
-            webbrowser.open("http://localhost:8501")
-
 if __name__ == "__main__":
-    launch_dashboard()
     app = AGVSimulation()
     app.run()
