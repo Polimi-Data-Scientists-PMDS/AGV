@@ -2,18 +2,18 @@ import numpy as np
 import heapq
 import cv2
 
-from planning.path import Path
+from planning.planning import Path, GlobalMap
 from planning.high_level.planning_interface import HighLevelPlanner
 from perception.perception import SensorData
 from localization.localization import RobotState, Position
 from config import VisGraphPlanningConfig, WorldConfig
 
 class VisGraphPlanner(HighLevelPlanner):
-    def __init__(self, logger):
-        super().__init__(logger)
+    def __init__(self, logger, global_map: GlobalMap):
+        super().__init__(logger, global_map)
 
         self.config = VisGraphPlanningConfig()
-        self.raw_obstacles = WorldConfig.fixed_obstacles
+        self.raw_obstacles = self.global_map.get_obstacles()
 
         # 1. Static Map Data: List of inflated polygons (4 corners each)
         self.inflated_obstacles = self._prepare_obstacles(self.raw_obstacles)

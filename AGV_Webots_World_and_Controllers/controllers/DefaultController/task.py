@@ -15,8 +15,8 @@ class Task:
     ll_planner_class: type[LowLevelPlanner] = GridPlanner
 
     goal_positions = [
-        WorldConfig.goals["PICKUP_07"],          # Pickup point 7
-        WorldConfig.goals["CHARGING_STATION"],   # Charging station
+        # WorldConfig.goals["PICKUP_07"],          # Pickup point 7
+        # WorldConfig.goals["CHARGING_STATION"],   # Charging station
         WorldConfig.goals["DROPOFF_01"],         # Dropoff point 01
         WorldConfig.goals["PICKUP_03"],          # Pickup point 3
         WorldConfig.goals["PICKUP_04"],          # Pickup point 4
@@ -31,3 +31,4 @@ class Task:
         WorldConfig.goals["CHARGING_STATION"],   # Charging station
     ]
 
+WordConfig.goals[str]

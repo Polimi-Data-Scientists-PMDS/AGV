@@ -1,29 +1,17 @@
 import numpy as np
 import cv2
+import os
 import heapq
 
-from planning.path import Path
+from planning.planning import Path, GlobalMap
 from planning.low_level.planning_interface import LowLevelPlanner
 from perception.perception import SensorData
 from localization.localization import RobotState, Position
 from config import GridPlanningConfig, LOGS_DIR
 
 class GridPlanner(LowLevelPlanner):
-    def __init__(self, logger, lidar_specs):
-        super().__init__(logger, lidar_specs)
-
-        self.config = GridPlanningConfig()
-
-        # self.VISION_DISTANCE = 8    # (m)
-        # self.config.padding_SIZE = 0.8
-        # self.GRID_RES = 0.2         # (m)
-        # self.GRID_CELLS = int(np.ceil(self.VISION_DISTANCE / self.GRID_RES))   
-        # self.config.padding_PIXELS = int(np.ceil(self.config.padding_SIZE / self.GRID_RES)) 
-        
-        # self.UNKNOWN = 0
-        # self.config.free = 128
-        # self.config.padding = 200
-        # self.config.occupied = 255
+    def __init__(self, logger, lidar_specs, global_map: GlobalMap):
+        super().__init__(logger, lidar_specs, global_map, GridPlanningConfig())
 
         # Initialize Pathfinding and Visualization
         self.pathfinder = AStarPathfinder()
@@ -43,7 +31,19 @@ class GridPlanner(LowLevelPlanner):
             return self.last_path
         
         # --- 1. CREATE GRID ---
-        grid = self.__create_grid(sensor_data.pointcloud, state)
+        raw_grid, all_obs_pixels = self.__create_raw_grid(sensor_data.pointcloud, state)
+
+        static_walls, unknown_obstacles = self.__locate_walls(all_obs_pixels, state)
+        semantic_obstacles, unclassified_dynamic_obs = self.__locate_moving_obstacles(unknown_obstacles, state, sensor_data)
+
+        # remove lidar errors??????
+        # detect moving obstacles
+        # semantic_obstacles, unclassified_dynamic_obs = self.__filter_against_camera(
+        #     unknown_obstacles, state, sensor_data.yolo_detections, sensor_data.camera_matrices
+        # )
+
+        grid = self.__apply_padding(raw_grid, all_obs_pixels)
+        #grid = self.__create_grid(sensor_data.pointcloud, state)
 
         # --- 2. LOCAL GOAL ---
         center_px = self.config.grid_cells // 2
@@ -60,7 +60,7 @@ class GridPlanner(LowLevelPlanner):
         # --- 5. VISUALIZE (Throttled to 10 FPS) ---
         if sensor_data.time - self.last_draw_time > 0.1:
             waypoints_px = [self.__world_to_pixel(state, wp) for wp in waypoints]
-            self.visualizer.draw_grid(grid, state.theta, (target_px, target_py), path, waypoints_px)
+            self.visualizer.draw_grid(grid, state.theta, (target_px, target_py), path, waypoints_px, static_walls)
             self.last_draw_time = sensor_data.time
 
         final_path = Path(waypoints)
@@ -74,31 +74,137 @@ class GridPlanner(LowLevelPlanner):
             self.last_plan_time = sensor_data.time
         return should
     
-    def __create_grid(self, pointcloud, state:RobotState):
-        grid = np.full((self.config.grid_cells, self.config.grid_cells), self.config.unknown, dtype=np.uint8)
+    def __create_raw_grid(self, pointcloud, state:RobotState):
+        """Creates the base map with only Free, Unknown, and Occupied spaces."""
+        raw_grid = np.full((self.config.grid_cells, self.config.grid_cells), self.config.unknown, dtype=np.uint8)
         center = self.config.grid_cells // 2
-        grid[center, center] = self.config.free
+        raw_grid[center, center] = self.config.free
 
         free_pixels, obs_pixels = self.__extract_grid_coordinates(pointcloud, state)
     
         # Raytrace free space
         for px, py in free_pixels:
-            cv2.line(grid, (center, center), (px, py), color=self.config.free, thickness=1)
+            cv2.line(raw_grid, (center, center), (px, py), color=self.config.free, thickness=1)
+            
+        # Draw Obstacles (Raw hits)
+        for px, py in obs_pixels:
+            cv2.circle(raw_grid, (px, py), radius=1, color=self.config.occupied, thickness=-1)
+
+        return raw_grid, obs_pixels
+
+    def __locate_walls(self, all_obs_pixels, state: RobotState):
+        static_walls = []
+        unknown_obstacles = []
+
+        for px, py in all_obs_pixels:
+            # 1. Convert local grid pixel back to real-world coordinates
+            # (Your grid is already world-aligned, so this function is perfect)
+            world_pos = self.__pixel_to_world(state, px, py)
+            
+            # 2. Ask the global map if there is a known wall at this coordinate
+            if self.global_map.is_occupied(world_pos.x, world_pos.y):
+                static_walls.append((px, py))
+            else:
+                unknown_obstacles.append((px, py))
+
+        return static_walls, unknown_obstacles
+    
+    def __locate_moving_obstacles(self, unknown_obstacles, state: RobotState, sensor_data: SensorData):
+        semantic_obstacles = []       # List of (px, py, class_name)
+        unclassified_dynamic_obs = [] # List of (px, py)
+        
+        # You will need to add lidar_height_m to your GridPlanningConfig
+        z_lidar = self.config.lidar_height_m 
+
+        for px, py in unknown_obstacles:
+            # 1. Convert grid pixel back to real-world (X, Y)
+            world_pos = self.__pixel_to_world(state, px, py)
+            
+            # 2. Project 3D World Point to 2D Camera Pixel (u, v)
+            u, v = self.__project_world_to_camera(world_pos.x, world_pos.y, z_lidar, sensor_data)
+            
+            # 3. Check against YOLO Bounding Boxes
+            detected_class = None
+            if u is not None and v is not None:
+                for det in sensor_data.yolo_detections:
+                    # Assuming det has xmin, ymin, xmax, ymax, and class_name
+                    if det.xmin <= u <= det.xmax and det.ymin <= v <= det.ymax:
+                        detected_class = det.class_name
+                        break
+            
+            # 4. Sort the obstacle based on what we found
+            if detected_class:
+                semantic_obstacles.append((px, py, detected_class))
+            else:
+                unclassified_dynamic_obs.append((px, py))
+
+        return semantic_obstacles, unclassified_dynamic_obs
+
+    def __project_world_to_camera(self, X_world, Y_world, Z_world, sensor_data: SensorData):
+        """ Projects a 3D real-world point into the camera's 2D pixel space. """
+        # Create a 4D homogeneous coordinate vector [X, Y, Z, 1]
+        point_3d = np.array([X_world, Y_world, Z_world, 1.0])
+        
+        # Multiply by your combined Camera Projection Matrix (P = K * T)
+        # P is a 3x4 matrix provided by your sensor_data
+        point_2d_homogeneous = np.dot(sensor_data.camera_matrices, point_3d)
+        
+        # Avoid division by zero
+        if point_2d_homogeneous[2] <= 0:
+            return None, None # The point is behind the camera!
+            
+        # Normalize to get actual pixel coordinates (u, v)
+        u = int(point_2d_homogeneous[0] / point_2d_homogeneous[2])
+        v = int(point_2d_homogeneous[1] / point_2d_homogeneous[2])
+        
+        return u, v
+    
+    def __apply_padding(self, raw_grid, obs_pixels):
+        """Takes the raw map and creates the final costmap by inflating obstacles."""
+        # Create a copy so the raw_grid remains intact for future semantic ID use
+        costmap = raw_grid.copy()
+        
         # Draw Padding
         for px, py in obs_pixels:
-            cv2.circle(grid, (px, py), radius=self.config.padding_pixels, color=self.config.padding, thickness=-1)
-        # Draw Obstacles
+            cv2.circle(costmap, (px, py), radius=self.config.padding_pixels, color=self.config.padding, thickness=-1)
+            
+        # Redraw Obstacles on top of the padding 
+        # (This ensures the center remains 'occupied' and isn't overwritten by the padding color)
         for px, py in obs_pixels:
-            cv2.circle(grid, (px, py), radius=1, color=self.config.occupied, thickness=-1)
+            cv2.circle(costmap, (px, py), radius=1, color=self.config.occupied, thickness=-1)
 
-        return grid
+        return costmap
+    
+
     
     def __extract_grid_coordinates(self, pointcloud, state:RobotState):
         free_pixels, obs_pixels = [], []
         max_r = (self.config.grid_cells * self.config.grid_res) / 2.0
         center = self.config.grid_cells // 2
 
-        for angle, distance in pointcloud:
+        # If a point jumps by more than this amount (in meters) 
+        # from BOTH of its neighbors, it's a ghost.
+  
+        num_points = len(pointcloud)
+
+        for i in range(num_points):
+            angle, distance = pointcloud[i]
+
+            # 1. SPIKE FILTER LOGIC
+            if not np.isinf(distance):
+                # Get the distance of the beam to the left and right (wrapping around the circle)
+                prev_dist = pointcloud[i - 1][1]
+                next_dist = pointcloud[(i + 1) % num_points][1]
+
+                # If the neighbors are inf, we treat them as far away
+                prev_dist = prev_dist if not np.isinf(prev_dist) else max_r
+                next_dist = next_dist if not np.isinf(next_dist) else max_r
+
+                # If this beam is totally isolated in distance, it's noise! Skip it.
+                if abs(distance - prev_dist) > self.config.noise_tolerance and abs(distance - next_dist) > self.config.noise_tolerance:
+                    continue # Drops the error, doesn't add it to the map
+
+            # 2. STANDARD EXTRACTION LOGIC
             is_obs = not (np.isinf(distance) or distance >= max_r)
             draw_d = max_r * 1.5 if not is_obs else distance
             
@@ -312,16 +418,34 @@ class LocalGridVisualizer:
     def __init__(self, display_size=500):
         self.window_name = "Local Planner Grid"
         self.display_size = display_size
+        self.config = GridPlanningConfig() # Instantiate config to access values and colors
 
-    def draw_grid(self, grid_matrix, robot_theta, local_goal_px=None, path=None, waypoints_px=None):
-        image = grid_matrix.astype(np.uint8)
-        display_image = cv2.resize(image, (self.display_size, self.display_size), interpolation=cv2.INTER_NEAREST)
-        display_image = cv2.cvtColor(display_image, cv2.COLOR_GRAY2BGR)
+    def draw_grid(self, grid_matrix, robot_theta, local_goal_px=None, path=None, waypoints_px=None, static_walls_px=None):
+        # 1. Create an empty BGR image with the same dimensions as the grid
+        h, w = grid_matrix.shape
+        color_image = np.zeros((h, w, 3), dtype=np.uint8)
+
+        # 2. Map logical grid values directly to their respective BGR colors
+        color_image[grid_matrix == self.config.unknown] = self.config.unknown_color
+        color_image[grid_matrix == self.config.free] = self.config.free_color
+        color_image[grid_matrix == self.config.padding] = self.config.padding_color
+        color_image[grid_matrix == self.config.occupied] = self.config.occupied_color
+
+        if static_walls_px:
+            for wx, wy in static_walls_px:
+                if 0 <= wx < w and 0 <= wy < h:
+                    cv2.circle(color_image, (wx, wy), radius=1, color=self.config.walls_color, thickness=-1)
+
+        # 3. Resize the mapped color image to the display size
+        display_image = cv2.resize(color_image, (self.display_size, self.display_size), interpolation=cv2.INTER_NEAREST)
+        
+        # Calculate scale for drawing paths and points
         scale = self.display_size / grid_matrix.shape[0]
 
         def to_screen(px_coords):
             return (int(px_coords[0] * scale + scale / 2), int(px_coords[1] * scale + scale / 2))
 
+        # --- Draw Overlays ---
         if path and len(path) > 1:
             for i in range(len(path) - 1):
                 cv2.line(display_image, to_screen(path[i]), to_screen(path[i+1]), (255, 0, 0), 2)
@@ -332,13 +456,12 @@ class LocalGridVisualizer:
             for wp in waypoints_px:
                 cv2.circle(display_image, to_screen(wp), 5, (0, 255, 255), -1)
 
+        # Draw Robot
         center = self.display_size // 2
         cv2.circle(display_image, (center, center), 7, (0, 0, 255), -1) 
         tip = (int(center + 35 * np.cos(robot_theta)), int(center - 35 * np.sin(robot_theta)))
         cv2.arrowedLine(display_image, (center, center), tip, (0, 0, 255), 3)
 
-
         # Save the grid image to disk so the Streamlit dashboard can access it
-        import os
         os.makedirs(LOGS_DIR, exist_ok=True)
         cv2.imwrite(os.path.join(LOGS_DIR, "local_planner_grid.jpg"), display_image)
