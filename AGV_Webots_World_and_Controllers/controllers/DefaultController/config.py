@@ -93,6 +93,10 @@ class ControlConfig:
 @dataclass(frozen=True)
 class PlanningConfig:
     goal_reached_thresh = 1
+    global_map_res = 0.2
+    world_width = 80.0   # (m) Total width of your simulated/real world
+    world_height = 80.0  # (m) Total height of your simulated/real world
+    tolerance_m = 0.4    # (m) How close a LiDAR hit can be to a wall to 
 
 @dataclass(frozen=True)
 class HighLevelPlanningConfig(PlanningConfig):
@@ -116,11 +120,19 @@ class GridPlanningConfig(LowLevelPlanningConfig):
     grid_res = 0.2         # (m)
     grid_cells = int(np.ceil(vision_distance / grid_res))   
     padding_pixels = int(np.ceil(padding_size / grid_res)) 
+
+    noise_tolerance = 1 
     
-    unknown = 0
-    free = 128
-    padding = 200
-    occupied = 255
+    unknown = -1
+    free = 0
+    occupied = 1
+    padding = 2
+
+    unknown_color = (0, 0, 0)          
+    free_color = (128, 128, 128)   
+    padding_color = (200, 200, 200)   
+    occupied_color = (255, 255, 255)  
+    walls_color = (0, 165, 255)   
 
     # A*
     free_cost = 1.0

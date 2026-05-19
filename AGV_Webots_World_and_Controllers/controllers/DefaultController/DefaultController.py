@@ -1,7 +1,7 @@
 import os
 import sys
 
-from config import PlanningConfig, LogConfig, LOGGER_DIR, LOGS_DIR, use_react
+from config import WorldConfig, PlanningConfig, LogConfig, LOGGER_DIR, LOGS_DIR
 from task import Task
 
 if LOGGER_DIR not in sys.path:
@@ -13,7 +13,7 @@ from perception.perception import Perception, SensorData
 from localization.localization import Localization, Position, RobotState
 
 
-from planning.path import Path
+from planning.planning import Path, GlobalMap
 from planning.high_level.planning_interface import HighLevelPlanner
 from planning.low_level.planning_interface import LowLevelPlanner
 
@@ -35,15 +35,22 @@ class AGVSimulation:
         self.planning_config = PlanningConfig()
         self.log_config = LogConfig()
 
-        
+        # Data
+        self.global_map: GlobalMap = GlobalMap(WorldConfig.fixed_obstacles)
+
         # Modules
         self.hardware:      HardwareInterface   = WebotsInterface()
         self.logger:        RobotLog            = self.__init_logger()
         self.perception:    Perception          = Perception(self.hardware)
         self.localization:  Localization        = Localization()
-        self.hl_planning:   HighLevelPlanner    = Task.hl_planner_class(self.logger)
-        self.ll_planning:   LowLevelPlanner     = Task.ll_planner_class(self.logger, self.hardware.lidar.get_specs())
+        self.hl_planning:   HighLevelPlanner    = Task.hl_planner_class(self.logger, self.global_map)
+        self.ll_planning:   LowLevelPlanner     = Task.ll_planner_class(
+                                                        self.logger, 
+                                                        self.hardware.lidar.get_specs(), 
+                                                        self.global_map)
         self.control:       Control             = Control()
+
+
 
         # Environment
         self.environment = DynamicEnvironment(self.hardware.robot)

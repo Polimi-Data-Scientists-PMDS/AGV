@@ -1,7 +1,7 @@
 # navigation/obstacle_avoidance.py
 import numpy as np
 
-from planning.path import Path
+from planning.planning import Path
 from planning.low_level.planning_interface import LowLevelPlanner
 from perception.perception import SensorData
 from localization.localization import RobotState, Position
@@ -11,10 +11,8 @@ from config import SectorPlanningConfig
 
 
 class SectorPlanner(LowLevelPlanner):
-    def __init__(self, logger, lidar_specs):
-        super().__init__(logger, lidar_specs)
-
-        self.config = SectorPlanningConfig()
+    def __init__(self, logger, lidar_specs, global_map):
+        super().__init__(logger, lidar_specs, global_map, SectorPlanningConfig())
 
         self.used_obstacle_ids = set()
         self.used_space_ids = set()
