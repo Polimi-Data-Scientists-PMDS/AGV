@@ -1,79 +1,63 @@
-import { useEffect, useState } from 'react';
-
-type TableValue = string | number | boolean | null | undefined;
-type TableRow = Record<string, TableValue>;
-
-type Column = {
-  key: string;
-  label: string;
-};
+import { useEffect, useState } from "react";
+import {
+  asNumber,
+  emptySimulationTableData,
+  eventColumns,
+  fetchSimulationTableData,
+  formatTableValue,
+  isNumericValue,
+  simulationColumns,
+  telemetryColumns,
+  type Column,
+  type SimulationTableData,
+  type TableRow,
+} from "./data";
 
 type DataTableProps = {
   title: string;
   emptyMessage: string;
   columns: Column[];
   rows: TableRow[];
+  defaultOpen?: boolean;
+  compact?: boolean;
 };
 
-type SimulationTableData = {
-  simulations: TableRow[];
-  events: TableRow[];
-  telemetry: TableRow[];
+type SimulationTablesProps = {
+  data: SimulationTableData;
+  defaultOpen?: boolean;
+  compact?: boolean;
 };
 
-const parseJsonLines = (text: string): TableRow[] =>
-  text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as TableRow);
-
-const fetchJsonLines = async (url: string): Promise<TableRow[]> => {
-  const response = await fetch(url);
-  return response.ok ? parseJsonLines(await response.text()) : [];
-};
-
-const simulationId = (row: TableRow) => row.id ?? row.sim_id;
-
-const latestSimulationRows = (rows: TableRow[]) => {
-  const latest = new Map<TableValue, TableRow>();
-  const withoutId: TableRow[] = [];
-
-  rows.forEach((row) => {
-    const id = simulationId(row);
-    if (id === null || id === undefined) {
-      withoutId.push(row);
-    } else {
-      latest.set(id, row);
-    }
-  });
-
-  return [...latest.values(), ...withoutId];
-};
-
-const formatValue = (value: TableValue) => value ?? '';
-
-const DataTable = ({ title, emptyMessage, columns, rows }: DataTableProps) => {
+export function DataTable({ title, emptyMessage, columns, rows, defaultOpen = false, compact = false }: DataTableProps) {
   return (
-    <details className="simulation-table-section">
+    <details className={`simulation-table-section ${compact ? "simulation-table-section-compact" : ""}`} open={defaultOpen}>
       <summary>
-        <h2>{title}</h2>
+        <span>{title}</span>
+        <small>{rows.length} rows</small>
       </summary>
       {rows.length === 0 ? (
-        <p>{emptyMessage}</p>
+        <p className="table-empty">{emptyMessage}</p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table border={1} cellPadding="10" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="table-scroll">
+          <table className="data-table">
             <thead>
-              <tr style={{ backgroundColor: '#f4f4f4' }}>
-                {columns.map(column => <th key={column.key}>{column.label}</th>)}
+              <tr>
+                {columns.map((column) => (
+                  <th key={column.key}>{column.label}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {rows.map((row, index) => (
-                // rows use `id` (simulations) or `sim_id` (events/telemetry); fall back to index
                 <tr key={`${title}-${row.id ?? row.sim_id ?? index}-${row.sim_time ?? row.event_time ?? index}`}>
-                  {columns.map(column => <td key={column.key}>{formatValue(row[column.key])}</td>)}
+                  {columns.map((column) => {
+                    const value = row[column.key];
+                    return (
+                      <td key={column.key} data-numeric={isNumericValue(value) ? "true" : undefined}>
+                        {formatTableValue(value)}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -82,70 +66,63 @@ const DataTable = ({ title, emptyMessage, columns, rows }: DataTableProps) => {
       )}
     </details>
   );
-};
+}
 
-// Keys match the JSONL fields written by robot_log.py
-const simulationColumns: Column[] = [
-  { key: 'id',                  label: 'Sim ID'      },
-  { key: 'controller_version',  label: 'Controller'  },
-  { key: 'total_sim_time',      label: 'Total Time'  },
-  { key: 'total_idle_time',     label: 'Idle Time'   },
-  { key: 'obstacle_count',      label: 'Obstacles'   },
-  { key: 'event_count',         label: 'Events'      },
-];
+export function SimulationTables({ data, defaultOpen = false, compact = false }: SimulationTablesProps) {
+  return (
+    <div className="simulation-tables">
+      <DataTable
+        title="Simulations"
+        emptyMessage="No simulations saved yet."
+        columns={simulationColumns}
+        rows={data.simulations}
+        defaultOpen={defaultOpen}
+        compact={compact}
+      />
+      <DataTable
+        title="Events"
+        emptyMessage="No events saved yet."
+        columns={eventColumns}
+        rows={data.events}
+        defaultOpen={defaultOpen}
+        compact={compact}
+      />
+      <DataTable
+        title="Event Telemetry"
+        emptyMessage="No event telemetry saved yet."
+        columns={telemetryColumns}
+        rows={data.telemetry}
+        defaultOpen={defaultOpen}
+        compact={compact}
+      />
+    </div>
+  );
+}
 
-const eventColumns: Column[] = [
-  { key: 'sim_id',   label: 'Sim ID'   },
-  { key: 'sim_time', label: 'Sim Time' },
-  { key: 'e_type',   label: 'Type'     },
-  { key: 'details',  label: 'Details'  },
-];
+export function latestNumericValue(rows: TableRow[], key: string) {
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const value = asNumber(rows[index][key]);
+    if (value !== null) {
+      return value;
+    }
+  }
 
-const telemetryColumns: Column[] = [
-  { key: 'sim_id',              label: 'Sim ID'          },
-  { key: 'event_time',          label: 'Event Time'      },
-  { key: 'e_type',              label: 'Type'            },
-  { key: 'state_x',             label: 'State X'         },
-  { key: 'state_y',             label: 'State Y'         },
-  { key: 'state_theta',         label: 'State Theta'     },
-  { key: 'gps_x',               label: 'GPS X'           },
-  { key: 'gps_y',               label: 'GPS Y'           },
-  { key: 'error_distance',      label: 'Error Distance'  },
-  { key: 'error_heading',       label: 'Error Heading'   },
-  { key: 'current_vel_linear',  label: 'Current Linear'  },
-  { key: 'current_vel_angular', label: 'Current Angular' },
-  { key: 'target_vel_linear',   label: 'Target Linear'   },
-  { key: 'target_vel_angular',  label: 'Target Angular'  },
-  { key: 'next_point_x',        label: 'Next Point X'    },
-  { key: 'next_point_y',        label: 'Next Point Y'    },
-];
+  return null;
+}
 
-const SimulationTable = () => {
-  const [data, setData] = useState<SimulationTableData>({
-    simulations: [],
-    events: [],
-    telemetry: [],
-  });
+export default function SimulationTable() {
+  const [data, setData] = useState<SimulationTableData>(emptySimulationTableData);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Each endpoint serves the corresponding JSONL file directly.
-        // simulations.jsonl is overwritten in-place by robot_log.py so one
-        // fetch is enough; no history/current split needed.
-        const [simulationRows, events, telemetry] = await Promise.all([
-          fetchJsonLines('/api/simulations'),
-          fetchJsonLines('/api/events'),
-          fetchJsonLines('/api/event-telemetry'),
-        ]);
-
-        setData({ simulations: latestSimulationRows(simulationRows), events, telemetry });
-        setError('');
+        setData(await fetchSimulationTableData());
+        setError("");
       } catch (err) {
-        console.error('Error loading simulation tables:', err);
-        setError('Could not load simulation data.');
+        console.error("Error loading simulation tables:", err);
+        setError("Could not load simulation data.");
       } finally {
         setLoading(false);
       }
@@ -156,34 +133,13 @@ const SimulationTable = () => {
     return () => window.clearInterval(intervalId);
   }, []);
 
-  return (
-    <div style={{ padding: '20px' }}>
-      {loading && <p>Loading simulation data...</p>}
-      {!loading && error && <p style={{ color: 'red' }}>{error}</p>}
-      {!loading && !error && (
-        <>
-          <DataTable
-            title="Simulations"
-            emptyMessage="No simulations saved yet."
-            columns={simulationColumns}
-            rows={data.simulations}
-          />
-          <DataTable
-            title="Events"
-            emptyMessage="No events saved yet."
-            columns={eventColumns}
-            rows={data.events}
-          />
-          <DataTable
-            title="Event Telemetry"
-            emptyMessage="No event telemetry saved yet."
-            columns={telemetryColumns}
-            rows={data.telemetry}
-          />
-        </>
-      )}
-    </div>
-  );
-};
+  if (loading) {
+    return <p className="panel-message">Loading simulation data...</p>;
+  }
 
-export default SimulationTable;
+  if (error) {
+    return <p className="panel-message panel-message-error">{error}</p>;
+  }
+
+  return <SimulationTables data={data} />;
+}
