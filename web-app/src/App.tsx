@@ -17,7 +17,6 @@ import {
   Navigation,
   Radio,
   Route as RouteIcon,
-  Settings,
   ShieldAlert,
   Target,
   Terminal,
@@ -79,13 +78,21 @@ type AppState = {
   robotData: RobotData | null;
 };
 
+type MarkdownBlock =
+  | { type: "heading"; level: 1 | 2 | 3 | 4; text: string }
+  | { type: "paragraph"; text: string }
+  | { type: "unordered-list"; items: string[] }
+  | { type: "ordered-list"; items: string[] };
+
 const navItems: Array<{ label: string; to: string; icon: LucideIcon }> = [
   { label: "Dashboard", to: "/", icon: Home },
   { label: "Map View", to: "/map", icon: MapIcon },
   { label: "Fleet Status", to: "/fleet", icon: Bot },
   { label: "Log Analysis", to: "/logs", icon: Database },
-  { label: "Help Center", to: "/help", icon: CircleQuestionMark },
 ];
+
+const helpNavItem: { label: string; to: string; icon: LucideIcon } = { label: "Help Center", to: "/help", icon: CircleQuestionMark };
+const mobileNavItems = [...navItems, helpNavItem];
 
 const fmt = (value: number | null | undefined, digits = 2) => (value === null || value === undefined || !Number.isFinite(value) ? "N/A" : value.toFixed(digits));
 
@@ -115,6 +122,152 @@ function formatRuntimeShort(seconds: number) {
 
 function latestRow(rows: TableRow[]) {
   return rows.length > 0 ? rows[rows.length - 1] : null;
+}
+
+function parseMarkdown(source: string) {
+  const blocks: MarkdownBlock[] = [];
+  const paragraphLines: string[] = [];
+  let activeList: Extract<MarkdownBlock, { type: "unordered-list" | "ordered-list" }> | null = null;
+
+  function flushParagraph() {
+    if (paragraphLines.length > 0) {
+      blocks.push({ type: "paragraph", text: paragraphLines.join(" ") });
+      paragraphLines.length = 0;
+    }
+  }
+
+  function flushList() {
+    if (activeList) {
+      blocks.push(activeList);
+      activeList = null;
+    }
+  }
+
+  function addListItem(type: "unordered-list" | "ordered-list", text: string) {
+    flushParagraph();
+
+    if (!activeList || activeList.type !== type) {
+      flushList();
+      activeList = { type, items: [] };
+    }
+
+    activeList.items.push(text);
+  }
+
+  for (const rawLine of source.split(/\r?\n/)) {
+    const line = rawLine.trimEnd();
+    const trimmed = line.trim();
+
+    if (trimmed === "") {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const heading = /^(#{1,4})\s+(.+)$/.exec(trimmed);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: "heading", level: heading[1].length as 1 | 2 | 3 | 4, text: heading[2] });
+      continue;
+    }
+
+    const unorderedItem = /^-\s+(.+)$/.exec(trimmed);
+    if (unorderedItem) {
+      addListItem("unordered-list", unorderedItem[1]);
+      continue;
+    }
+
+    const orderedItem = /^\d+\.\s+(.+)$/.exec(trimmed);
+    if (orderedItem) {
+      addListItem("ordered-list", orderedItem[1]);
+      continue;
+    }
+
+    if (activeList && /^\s+/.test(line) && activeList.items.length > 0) {
+      activeList.items[activeList.items.length - 1] = `${activeList.items[activeList.items.length - 1]} ${trimmed}`;
+      continue;
+    }
+
+    flushList();
+    paragraphLines.push(trimmed);
+  }
+
+  flushParagraph();
+  flushList();
+  return blocks;
+}
+
+function renderInlineMarkdown(text: string) {
+  const parts: ReactNode[] = [];
+  const tokenPattern = /(`[^`]+`|\*\*[^*]+\*\*)/g;
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(tokenPattern)) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+
+    const token = match[0];
+    if (token.startsWith("`")) {
+      parts.push(<code key={parts.length}>{token.slice(1, -1)}</code>);
+    } else {
+      parts.push(<strong key={parts.length}>{token.slice(2, -2)}</strong>);
+    }
+
+    lastIndex = match.index + token.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
+}
+
+function MarkdownPreview({ source }: { source: string }) {
+  const blocks = useMemo(() => parseMarkdown(source), [source]);
+
+  return (
+    <div className="markdown-preview">
+      {blocks.map((block, index) => {
+        if (block.type === "heading") {
+          if (block.level === 1) {
+            return <h1 key={index}>{renderInlineMarkdown(block.text)}</h1>;
+          }
+          if (block.level === 2) {
+            return <h2 key={index}>{renderInlineMarkdown(block.text)}</h2>;
+          }
+          if (block.level === 3) {
+            return <h3 key={index}>{renderInlineMarkdown(block.text)}</h3>;
+          }
+          return <h4 key={index}>{renderInlineMarkdown(block.text)}</h4>;
+        }
+
+        if (block.type === "unordered-list") {
+          return (
+            <ul key={index}>
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex}>{renderInlineMarkdown(item)}</li>
+              ))}
+            </ul>
+          );
+        }
+
+        if (block.type === "ordered-list") {
+          return (
+            <ol key={index}>
+              {block.items.map((item, itemIndex) => (
+                <li key={itemIndex}>{renderInlineMarkdown(item)}</li>
+              ))}
+            </ol>
+          );
+        }
+
+        return <p key={index}>{renderInlineMarkdown(block.text)}</p>;
+      })}
+    </div>
+  );
 }
 
 function Panel({ title, eyebrow, action, className = "", children }: PanelProps) {
@@ -245,7 +398,7 @@ function CommandShell({ state, children }: { state: AppState; children: ReactNod
           <span>AGV Command Center</span>
         </div>
         <nav className="top-nav" aria-label="Primary">
-          {navItems.slice(0, 4).map(({ label, to }) => (
+          {navItems.map(({ label, to }) => (
             <NavLink key={to} to={to} className={({ isActive }) => (isActive ? "active" : undefined)} end={to === "/"}>
               {label}
             </NavLink>
@@ -255,9 +408,9 @@ function CommandShell({ state, children }: { state: AppState; children: ReactNod
           <button type="button" aria-label="Notifications">
             <Bell size={20} aria-hidden="true" />
           </button>
-          <button type="button" aria-label="Settings">
-            <Settings size={20} aria-hidden="true" />
-          </button>
+          <NavLink to={helpNavItem.to} aria-label={helpNavItem.label} className={({ isActive }) => (isActive ? "active" : undefined)}>
+            <CircleQuestionMark size={20} aria-hidden="true" />
+          </NavLink>
         </div>
       </header>
 
@@ -285,15 +438,21 @@ function CommandShell({ state, children }: { state: AppState; children: ReactNod
         </nav>
 
         <div className="sidebar-footer">
-          <StatusPill tone={state.robotData ? "success" : "critical"}>{state.robotData ? "Live Signal" : "No Signal"}</StatusPill>
-          <span>{runtime}</span>
+          <div className="sidebar-status-row">
+            <StatusPill tone={state.robotData ? "success" : "critical"}>{state.robotData ? "Live Signal" : "No Signal"}</StatusPill>
+            <span>{runtime}</span>
+          </div>
+          <NavLink to={helpNavItem.to} className={({ isActive }) => `sidebar-help-link${isActive ? " active" : ""}`}>
+            <CircleQuestionMark size={20} aria-hidden="true" />
+            <span>{helpNavItem.label}</span>
+          </NavLink>
         </div>
       </aside>
 
       <main className="content-shell">{children}</main>
 
       <nav className="mobile-nav" aria-label="Mobile command modules">
-        {navItems.slice(0, 5).map(({ label, to, icon: Icon }) => (
+        {mobileNavItems.map(({ label, to, icon: Icon }) => (
           <NavLink key={to} to={to} className={({ isActive }) => (isActive ? "active" : undefined)} end={to === "/"}>
             <Icon size={20} aria-hidden="true" />
             <span>{label.split(" ")[0]}</span>
@@ -636,7 +795,7 @@ function buildChartPath(values: number[]) {
     .join(" ");
 }
 
-function HelpCenterPage({ readme, loading }: { readme: string; loading: boolean }) {
+function HelpCenterPage({ guide, loading }: { guide: string; loading: boolean }) {
   const cards = [
     {
       icon: Zap,
@@ -662,7 +821,11 @@ function HelpCenterPage({ readme, loading }: { readme: string; loading: boolean 
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Operator Support Portal" title="Help Center" description="All support content on this page is sourced from the root README.md." />
+      <PageHeader
+        eyebrow="Operator Support Portal"
+        title="Help Center"
+        description="All support content on this page is sourced from README.md and docs/web-app-user-guide.md"
+      />
 
       <section className="help-grid">
         {cards.map(({ icon: Icon, title, text }) => (
@@ -674,8 +837,8 @@ function HelpCenterPage({ readme, loading }: { readme: string; loading: boolean 
         ))}
       </section>
 
-      <Panel title="Repository Documentation" eyebrow="README.md">
-        {loading ? <p className="panel-message">Loading README.md...</p> : <pre className="readme-view">{readme}</pre>}
+      <Panel eyebrow="docs/web-app-user-guide.md">
+        {loading ? <p className="panel-message">Loading web-app-user-guide.md...</p> : <MarkdownPreview source={guide} />}
       </Panel>
     </div>
   );
@@ -815,31 +978,31 @@ function useGoalOrder() {
   return { goalOrder, selectedGoalName, goalsSaveStatus, handleMoveGoal, setSelectedGoalName };
 }
 
-function useReadme() {
-  const [readme, setReadme] = useState("");
-  const [readmeLoading, setReadmeLoading] = useState(true);
+function useHelpGuide() {
+  const [guide, setGuide] = useState("");
+  const [guideLoading, setGuideLoading] = useState(true);
 
   useEffect(() => {
-    async function loadReadme() {
+    async function loadGuide() {
       try {
-        const response = await fetch("/api/readme", { cache: "no-store" });
-        setReadme(response.ok ? await response.text() : "README.md could not be loaded.");
+        const response = await fetch("/api/help-guide", { cache: "no-store" });
+        setGuide(response.ok ? await response.text() : "docs/web-app-user-guide.md could not be loaded.");
       } finally {
-        setReadmeLoading(false);
+        setGuideLoading(false);
       }
     }
 
-    loadReadme();
+    loadGuide();
   }, []);
 
-  return { readme, readmeLoading };
+  return { guide, guideLoading };
 }
 
 export default function App() {
   const { robotData, robotError } = useRobotData();
   const { tableData, tablesLoading, tableError } = useSimulationTables();
   const { goalOrder, selectedGoalName, goalsSaveStatus, handleMoveGoal, setSelectedGoalName } = useGoalOrder();
-  const { readme, readmeLoading } = useReadme();
+  const { guide, guideLoading } = useHelpGuide();
   const state: AppState = {
     robotData,
   };
@@ -868,7 +1031,7 @@ export default function App() {
           <Route path="/map" element={<MapPage data={robotData} />} />
           <Route path="/fleet" element={<FleetPage data={robotData} />} />
           <Route path="/logs" element={<LogAnalysisPage tableData={tableData} loading={tablesLoading} error={tableError} />} />
-          <Route path="/help" element={<HelpCenterPage readme={readme} loading={readmeLoading} />} />
+          <Route path="/help" element={<HelpCenterPage guide={guide} loading={guideLoading} />} />
           <Route path="/support" element={<Navigate to="/help" replace />} />
           <Route path="/tables" element={<SimulationTable />} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -12,7 +12,7 @@ const simulationsPath    = path.join(logsDir, "simulations.jsonl");
 const eventsPath         = path.join(logsDir, "events.jsonl");
 const eventTelemetryPath = path.join(logsDir, "event_telemetry.jsonl");
 const goalsConfigPath    = path.resolve(__dirname, "src/goals.config.json");
-const readmePath         = path.resolve(__dirname, "../README.md");
+const userGuidePath      = path.resolve(__dirname, "../docs/web-app-user-guide.md");
 
 type GoalPoint = {
   name: string;
@@ -178,8 +178,8 @@ export default defineConfig({
           await serveJsonLines(eventTelemetryPath, res);
         });
 
-        server.middlewares.use("/api/readme", async (_req, res) => {
-          await serveText(readmePath, res);
+        server.middlewares.use("/api/help-guide", async (_req, res) => {
+          await serveText(userGuidePath, res);
         });
       },
     },
