@@ -12,6 +12,7 @@ const simulationsPath    = path.join(logsDir, "simulations.jsonl");
 const eventsPath         = path.join(logsDir, "events.jsonl");
 const eventTelemetryPath = path.join(logsDir, "event_telemetry.jsonl");
 const goalsConfigPath    = path.resolve(__dirname, "src/goals.config.json");
+const readmePath         = path.resolve(__dirname, "../README.md");
 
 type GoalPoint = {
   name: string;
@@ -79,6 +80,18 @@ async function serveJsonLines(pathname: string, res: { statusCode: number; setHe
   try {
     const text = await fs.readFile(pathname, "utf-8");
     res.setHeader("Content-Type", "application/x-ndjson");
+    res.setHeader("Cache-Control", "no-store");
+    res.end(text);
+  } catch {
+    res.statusCode = 404;
+    res.end("");
+  }
+}
+
+async function serveText(pathname: string, res: { statusCode: number; setHeader: (name: string, value: string) => void; end: (chunk?: string) => void }) {
+  try {
+    const text = await fs.readFile(pathname, "utf-8");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
     res.end(text);
   } catch {
@@ -163,6 +176,10 @@ export default defineConfig({
 
         server.middlewares.use("/api/event-telemetry", async (_req, res) => {
           await serveJsonLines(eventTelemetryPath, res);
+        });
+
+        server.middlewares.use("/api/readme", async (_req, res) => {
+          await serveText(readmePath, res);
         });
       },
     },
