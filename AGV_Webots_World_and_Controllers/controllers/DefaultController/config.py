@@ -63,7 +63,7 @@ class PerceptionConfig:
 
 @dataclass(frozen=True)
 class VisionConfig:
-    enable_object_detection = False
+    enable_object_detection = True
     yolo_model = "yolov8n.pt"
     yolo_thresh = 0.4
     
@@ -126,7 +126,6 @@ class SectorPlanningConfig(LowLevelPlanningConfig):
 class LogConfig:
     log_interval = 5.0      # s
     print_interval = 0.5    # s
-
 
 
 
