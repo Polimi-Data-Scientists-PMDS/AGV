@@ -73,6 +73,31 @@ To link your Python virtual environment with Webots:
 1. **Get the Python Path:** Use the path printed by the `setup.sh` script. Alternatively, you can find the absolute path manually by navigating to `.venv/bin/python3.12` and copying it.
 2. **Set the Path in Webots:** Open Webots and navigate to `Webots > Preferences > Python commands`. Paste the copied absolute path into the dedicated input box.
 
+### Running the Webots Simulation
+
+After Webots is configured with the project Python interpreter:
+
+1. Make sure the Python environment has been created with `./setup.sh` or the manual setup steps above.
+2. If you want simulation data saved to MySQL, make sure the `agv-logger` Docker container is running before starting the simulation.
+3. Open Webots.
+4. From Webots, open the world file:
+   ```text
+   AGV_Webots_World_and_Controllers/worlds/AGV_Warehouse_World.wbt
+   ```
+5. Confirm that the AGV robot in the world is using the `DefaultController` controller. The checked-in world file is already configured with:
+   ```text
+   controller "DefaultController"
+   ```
+6. Press the Webots run/play control to start the simulation.
+7. Keep Webots open while monitoring the AGV. The controller produces telemetry and log files that the dashboards read while the simulation is running.
+8. To monitor the React dashboard at the same time, start it separately from another terminal:
+   ```bash
+   cd web-app
+   npm run dev
+   ```
+
+If Webots fails to start the controller, re-check `Webots > Preferences > Python commands` and confirm it points to the absolute Python path inside `.venv`.
+
 ---
 
 ## Project Rules
@@ -124,6 +149,52 @@ Once inside the MySQL console (you will see the `mysql>` prompt), execute the fo
    Open the `Database_Structure.sql` file in your editor and copy-paste the queries into the console. Ensure you execute each query separately rather than all at once.
 
 If successful, you will see a `Query OK` message. You can exit the console by typing `EXIT;`.
+
+### Step 5: Verify the Database Setup
+
+Before running a simulation that should save data to MySQL, verify that the database and tables exist.
+
+If you are not already inside the MySQL console, open it again:
+
+```bash
+docker exec -it agv-logger mysql -u root -p
+```
+
+When prompted, enter `agv_pass`.
+
+Inside the `mysql>` prompt, run:
+
+```sql
+SHOW DATABASES;
+USE agv_data;
+SHOW TABLES;
+```
+
+The table list should include:
+
+```text
+Events
+EventTelemetry
+Simulations
+```
+
+To check that the table structures were created, run:
+
+```sql
+DESCRIBE Simulations;
+DESCRIBE Events;
+DESCRIBE EventTelemetry;
+```
+
+To check whether simulation data has been saved after running Webots, run:
+
+```sql
+SELECT COUNT(*) FROM Simulations;
+SELECT COUNT(*) FROM Events;
+SELECT COUNT(*) FROM EventTelemetry;
+```
+
+Counts of `0` are normal before the first saved run. After a run that saves successfully, at least `Simulations` should contain rows. If the database or tables are missing, re-run the creation commands and the queries from `Database_Structure.sql`.
 
 > [!NOTE]
 > - Ensure the `mysql-connector-python` package is installed in your Python environment.

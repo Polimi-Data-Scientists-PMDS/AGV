@@ -446,48 +446,154 @@ expected information.
 
 ## Key Terms
 
-### State
+**State**: the AGV's estimated pose: X position, Y position, and orientation.
 
-The AGV's estimated pose: X position, Y position, and orientation.
-
-### GPS
-
-The measured position values. These can be compared with the estimated state
+**GPS**: the measured position values. These can be compared with the estimated state
 values.
 
-### Theta
+**Theta**: the robot's orientation angle. It tells you which direction the robot is facing.
 
-The robot's orientation angle. It tells you which direction the robot is facing.
+**Linear Velocity**: forward or backward movement speed.
 
-### Linear Velocity
+**Angular Velocity**: turning speed.
 
-Forward or backward movement speed.
+**Current Velocity**: what the AGV is currently doing.
 
-### Angular Velocity
+**Target Velocity**: what the control system is asking the AGV to do.
 
-Turning speed.
+**Distance Error**: how far the AGV is from its current target point.
 
-### Current Velocity
+**Heading Error**: how far the AGV's current facing direction is from the desired facing direction.
 
-What the AGV is currently doing.
+**Goal**: the mission target the AGV is trying to reach.
 
-### Target Velocity
-
-What the control system is asking the AGV to do.
-
-### Distance Error
-
-How far the AGV is from its current target point.
-
-### Heading Error
-
-How far the AGV's current facing direction is from the desired facing direction.
-
-### Goal
-
-The mission target the AGV is trying to reach.
-
-### Next Point
-
-The short-term navigation point the AGV is currently following on the way to the
+**Next Point**: the short-term navigation point the AGV is currently following on the way to the
 goal.
+
+## Getting started
+
+This section summarizes the setup flow around the web app. For more detailed
+and precise setup information, use `README.md` in the project root.
+
+Use this section when you need to prepare the project environment around the
+web app before monitoring the AGV.
+
+### Install The Python Environment
+
+The recommended setup path is to run `./setup.sh` from the project root.
+
+The setup script creates a virtual environment, installs the required Python
+dependencies, and prints the absolute path to the Python interpreter that Webots
+must use.
+
+If you prefer a manual setup, create the virtual environment with
+`python3.12 -m venv .venv`, activate it with `source .venv/bin/activate`, and
+install the requirements with `pip install -r requirements.txt`.
+
+Activate the virtual environment every time you open a new terminal before
+running project Python commands.
+
+### Install The React Dashboard Dependencies
+
+The React dashboard dependencies live inside `web-app/`.
+
+For an initial local install, run `cd web-app`, then
+`npm install react react-dom`, then
+`npm install -D typescript vite @vitejs/plugin-react @types/react @types/react-dom`.
+
+After dependencies have been installed once, restore the same local packages
+from `package-lock.json` by running `cd web-app` and `npm install`.
+
+Start the web app with `cd web-app` and `npm run dev`.
+
+### Configure Webots
+
+Webots must use the Python interpreter from the project virtual environment.
+
+Use the path printed by `./setup.sh`. If you set up the environment manually,
+copy the absolute path to `.venv/bin/python3.12`.
+
+Open Webots, go to `Webots > Preferences > Python commands`, and paste that
+absolute Python path into the dedicated input box.
+
+Never save the world directly from Webots with `Cmd + Shift + S` or
+`Ctrl + Shift + S`, because doing so overwrites the `.wbt` file and removes its
+custom comments.
+
+### Run The Webots Simulation
+
+Open Webots and load
+`AGV_Webots_World_and_Controllers/worlds/AGV_Warehouse_World.wbt`.
+
+The checked-in world file is configured to use `DefaultController`.
+
+If you want the simulation to save data to MySQL, start the `agv-logger`
+container before pressing run in Webots.
+
+Press the Webots run/play control to start the simulation. Keep Webots open
+while monitoring the AGV from the React dashboard.
+
+If the controller does not start, re-check the Python commands setting in
+Webots preferences and confirm that it points to the absolute Python path inside
+`.venv`.
+
+### Set Up The Docker Database
+
+Install Docker Desktop for your operating system, open Docker Desktop, and wait
+for the Docker Engine to fully start.
+
+Start the MySQL container with
+`docker run --name agv-logger -e MYSQL_ROOT_PASSWORD=agv_pass -p 3306:3306 -d mysql:latest`.
+
+This creates a container named `agv-logger`, sets the MySQL root password to
+`agv_pass`, runs the database in the background, and maps port `3306` so the
+Python code can communicate with MySQL.
+
+Open the MySQL console with `docker exec -it agv-logger mysql -u root -p`.
+When prompted, enter `agv_pass`.
+
+Inside the `mysql>` prompt, create and select the database with
+`CREATE DATABASE agv_data;` and `USE agv_data;`.
+
+Open `Database_Structure.sql`, copy its queries into the MySQL console, and run
+each query separately. A successful query prints `Query OK`.
+
+Ensure `mysql-connector-python` is installed in the Python environment. When
+pulling new updates, check `Database_Structure.sql` again because schema changes
+must be applied to the local database.
+
+### Verify The Database
+
+Open the MySQL console with `docker exec -it agv-logger mysql -u root -p` and
+enter `agv_pass`.
+
+Inside the `mysql>` prompt, run `SHOW DATABASES;`, `USE agv_data;`, and
+`SHOW TABLES;`.
+
+The table list should include `Events`, `EventTelemetry`, and `Simulations`.
+
+To verify the table structures, run `DESCRIBE Simulations;`,
+`DESCRIBE Events;`, and `DESCRIBE EventTelemetry;`.
+
+After a Webots run that should save data, check saved row counts with
+`SELECT COUNT(*) FROM Simulations;`, `SELECT COUNT(*) FROM Events;`, and
+`SELECT COUNT(*) FROM EventTelemetry;`.
+
+Counts of `0` are normal before the first saved run. If the database or tables
+are missing, re-run the database creation commands and the queries from
+`Database_Structure.sql`.
+
+### Manage The Database Container
+
+Exit the MySQL console with `exit;`.
+
+Stop the database container with `docker stop agv-logger` when you want to free
+up system resources.
+
+Restart the existing database container with `docker start agv-logger` when you
+are ready to resume the Webots simulation.
+
+Do not run the original `docker run` command again after the container already
+exists. To manage the database manually after restarting it, re-enter the console
+with `docker exec -it agv-logger mysql -u root -p`, enter the password, and
+select the database with `USE agv_data;`.
