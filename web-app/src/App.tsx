@@ -84,6 +84,8 @@ type MarkdownBlock =
   | { type: "unordered-list"; items: string[] }
   | { type: "ordered-list"; items: string[] };
 
+type MarkdownListBlock = Extract<MarkdownBlock, { type: "unordered-list" | "ordered-list" }>;
+
 const navItems: Array<{ label: string; to: string; icon: LucideIcon }> = [
   { label: "Dashboard", to: "/", icon: Home },
   { label: "Map View", to: "/map", icon: MapIcon },
@@ -127,7 +129,7 @@ function latestRow(rows: TableRow[]) {
 function parseMarkdown(source: string) {
   const blocks: MarkdownBlock[] = [];
   const paragraphLines: string[] = [];
-  let activeList: Extract<MarkdownBlock, { type: "unordered-list" | "ordered-list" }> | null = null;
+  const parserState: { activeList: MarkdownListBlock | null } = { activeList: null };
 
   function flushParagraph() {
     if (paragraphLines.length > 0) {
@@ -137,18 +139,20 @@ function parseMarkdown(source: string) {
   }
 
   function flushList() {
-    if (activeList) {
-      blocks.push(activeList);
-      activeList = null;
+    if (parserState.activeList) {
+      blocks.push(parserState.activeList);
+      parserState.activeList = null;
     }
   }
 
-  function addListItem(type: "unordered-list" | "ordered-list", text: string) {
+  function addListItem(type: MarkdownListBlock["type"], text: string) {
     flushParagraph();
 
+    let activeList = parserState.activeList;
     if (!activeList || activeList.type !== type) {
       flushList();
-      activeList = { type, items: [] };
+      activeList = type === "unordered-list" ? { type: "unordered-list", items: [] } : { type: "ordered-list", items: [] };
+      parserState.activeList = activeList;
     }
 
     activeList.items.push(text);
@@ -184,6 +188,7 @@ function parseMarkdown(source: string) {
       continue;
     }
 
+    const activeList = parserState.activeList;
     if (activeList && /^\s+/.test(line) && activeList.items.length > 0) {
       activeList.items[activeList.items.length - 1] = `${activeList.items[activeList.items.length - 1]} ${trimmed}`;
       continue;
@@ -225,46 +230,79 @@ function renderInlineMarkdown(text: string) {
   return parts;
 }
 
+function renderMarkdownBlock(block: MarkdownBlock, index: number) {
+  if (block.type === "heading") {
+    if (block.level === 1) {
+      return <h1 key={index}>{renderInlineMarkdown(block.text)}</h1>;
+    }
+    if (block.level === 2) {
+      return <h2 key={index}>{renderInlineMarkdown(block.text)}</h2>;
+    }
+    if (block.level === 3) {
+      return <h3 key={index}>{renderInlineMarkdown(block.text)}</h3>;
+    }
+    return <h4 key={index}>{renderInlineMarkdown(block.text)}</h4>;
+  }
+
+  if (block.type === "unordered-list") {
+    return (
+      <ul key={index}>
+        {block.items.map((item, itemIndex) => (
+          <li key={itemIndex}>{renderInlineMarkdown(item)}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  if (block.type === "ordered-list") {
+    return (
+      <ol key={index}>
+        {block.items.map((item, itemIndex) => (
+          <li key={itemIndex}>{renderInlineMarkdown(item)}</li>
+        ))}
+      </ol>
+    );
+  }
+
+  return <p key={index}>{renderInlineMarkdown(block.text)}</p>;
+}
+
 function MarkdownPreview({ source }: { source: string }) {
   const blocks = useMemo(() => parseMarkdown(source), [source]);
+  const sections = useMemo(() => {
+    const groupedSections: Array<{ title: string | null; level: number | null; blocks: MarkdownBlock[] }> = [];
+
+    blocks.forEach((block) => {
+      if (block.type === "heading" && block.level <= 3) {
+        groupedSections.push({ title: block.text, level: block.level, blocks: [block] });
+        return;
+      }
+
+      if (groupedSections.length === 0) {
+        groupedSections.push({ title: null, level: null, blocks: [] });
+      }
+
+      groupedSections[groupedSections.length - 1].blocks.push(block);
+    });
+
+    return groupedSections;
+  }, [blocks]);
 
   return (
     <div className="markdown-preview">
-      {blocks.map((block, index) => {
-        if (block.type === "heading") {
-          if (block.level === 1) {
-            return <h1 key={index}>{renderInlineMarkdown(block.text)}</h1>;
-          }
-          if (block.level === 2) {
-            return <h2 key={index}>{renderInlineMarkdown(block.text)}</h2>;
-          }
-          if (block.level === 3) {
-            return <h3 key={index}>{renderInlineMarkdown(block.text)}</h3>;
-          }
-          return <h4 key={index}>{renderInlineMarkdown(block.text)}</h4>;
-        }
+      {sections.map((section, sectionIndex) => {
+        const sectionClass =
+          section.level === 1 || section.title === null
+            ? "markdown-section-intro"
+            : section.level === 2
+              ? "markdown-section-category"
+              : "markdown-section-detail";
 
-        if (block.type === "unordered-list") {
-          return (
-            <ul key={index}>
-              {block.items.map((item, itemIndex) => (
-                <li key={itemIndex}>{renderInlineMarkdown(item)}</li>
-              ))}
-            </ul>
-          );
-        }
-
-        if (block.type === "ordered-list") {
-          return (
-            <ol key={index}>
-              {block.items.map((item, itemIndex) => (
-                <li key={itemIndex}>{renderInlineMarkdown(item)}</li>
-              ))}
-            </ol>
-          );
-        }
-
-        return <p key={index}>{renderInlineMarkdown(block.text)}</p>;
+        return (
+          <section className={`markdown-section-card ${sectionClass}`} key={`${section.title ?? "guide-intro"}-${sectionIndex}`}>
+            {section.blocks.map((block, blockIndex) => renderMarkdownBlock(block, sectionIndex * 1000 + blockIndex))}
+          </section>
+        );
       })}
     </div>
   );
