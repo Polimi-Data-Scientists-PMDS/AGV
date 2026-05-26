@@ -173,7 +173,7 @@ class AGVSimulation:
     def __init_logger(self):
         """Initializes and starts the custom RobotLog."""
         log_file_path = os.path.join(LOGS_DIR, "robot_controller_runs.jsonl")
-        logger = RobotLog(log_file_path, controller_version="v1")
+        logger = RobotLog(log_file_path, unit_id="1")
         logger.start(self.hardware.get_time())
         return logger
 
