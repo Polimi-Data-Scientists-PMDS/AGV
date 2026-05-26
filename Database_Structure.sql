@@ -1,6 +1,6 @@
 CREATE TABLE Simulations (
   id INTEGER AUTO_INCREMENT PRIMARY KEY,
-  controller_version VARCHAR(64) NOT NULL,
+  unit_id VARCHAR(64) NOT NULL,
   total_sim_time TIME(6) NOT NULL,
   obstacle_count INTEGER NOT NULL,
   total_idle_time TIME(6) NOT NULL,
