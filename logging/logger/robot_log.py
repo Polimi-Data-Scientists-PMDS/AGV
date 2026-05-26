@@ -3,7 +3,7 @@ import json
 import mysql.connector
 
 class RobotLog:
-    def __init__(self, log_file_path, controller_version="unknown"):
+    def __init__(self, log_file_path, unit_id="unknown"):
         # TODO: remove self.log_file_path once the database is verified working
         self.log_file_path = log_file_path
         self.realtime_log_file_path = log_file_path.replace(".jsonl", "_realtime.jsonl") if log_file_path.endswith(".jsonl") else log_file_path + "_realtime.jsonl"
@@ -21,7 +21,7 @@ class RobotLog:
         with open(self.realtime_panel, "w", encoding="utf-8") as f:
             f.write("{}\n")
 
-        self.controller_version = controller_version
+        self.unit_id = unit_id
         self.start_time = None
         self.last_time = None
         self.total_time = 0.0
@@ -56,11 +56,11 @@ class RobotLog:
             # Setup database simulations
             insert_query_simulations = """
                     INSERT INTO Simulations (
-                        controller_version, total_sim_time, obstacle_count, total_idle_time, event_count
+                        unit_id, total_sim_time, obstacle_count, total_idle_time, event_count
                     ) VALUES (%s, %s, %s, %s, %s)
                 """
             cursor.execute(insert_query_simulations, (
-                    self.controller_version,
+                    self.unit_id,
                     self._seconds_to_mysql_time(0.0),
                     self.obstacle_count,
                     self._seconds_to_mysql_time(0.0),
@@ -130,6 +130,7 @@ class RobotLog:
         
         record = {
             "id": sim_id,
+            "unit_id": self.unit_id,
             "total_sim_time": total_sim_time,
             "obstacle_count": obstacle_count,
             "total_idle_time": total_idle_time,
@@ -321,7 +322,7 @@ class RobotLog:
 
         for sim_id, sim_time, event_type, details in self.events:
             events_dict = {
-                "controller_version": self.controller_version,
+                "unit_id": self.unit_id,
                 "obstacle_count": self.obstacle_count,
                 "event": [
                     {
