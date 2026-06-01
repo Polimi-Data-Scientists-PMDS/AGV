@@ -954,7 +954,9 @@ p {
 
 .simulation-tables {
   display: grid;
+  align-items: stretch;
   gap: 14px;
+  width: 100%;
 }
 
 .event-filter-bar {
@@ -1052,6 +1054,7 @@ p {
 }
 
 .simulation-table-section {
+  width: 100%;
   overflow: hidden;
 }
 
@@ -1081,6 +1084,7 @@ p {
 }
 
 .table-scroll {
+  width: 100%;
   overflow-x: auto;
 }
 
@@ -1088,7 +1092,7 @@ p {
   width: 100%;
   min-width: 760px;
   border-collapse: collapse;
-  text-align: left;
+  text-align: center;
 }
 
 .data-table th,
@@ -1111,11 +1115,12 @@ p {
   font-family: var(--mono);
   font-size: 12px;
   line-height: 1.45;
+  text-align: center;
   vertical-align: top;
 }
 
 .data-table td[data-numeric="true"] {
-  text-align: right;
+  text-align: center;
 }
 
 .data-table tbody tr:nth-child(even) {
