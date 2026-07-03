@@ -4,10 +4,22 @@ os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
 
 import cv2
 import numpy as np
+from dataclasses import dataclass
 from ultralytics import YOLO
 import torch
 
 from config import LOGS_DIR, VisionConfig
+
+
+@dataclass
+class Detection:
+    """Simple detection record consumed by planning (YoloLabeler)."""
+    xmin: float
+    ymin: float
+    xmax: float
+    ymax: float
+    class_name: str
+    confidence: float
 
 
 class ObjectDetector:
@@ -71,5 +83,15 @@ class ObjectDetector:
         os.makedirs(LOGS_DIR, exist_ok=True)
         cv2.imwrite(os.path.join(LOGS_DIR, "camera_feed.jpg"), annotated_frame)
         
-        # Return the raw detection data in case the robot needs to react to it later!
-        return results[0].boxes
+        # Convert ultralytics Boxes into simple Detection records so downstream
+        # code (YoloLabeler) doesn't depend on the ultralytics API.
+        detections = []
+        names = results[0].names
+        for box in results[0].boxes:
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            detections.append(Detection(
+                xmin=x1, ymin=y1, xmax=x2, ymax=y2,
+                class_name=names[int(box.cls[0])],
+                confidence=float(box.conf[0]),
+            ))
+        return detections

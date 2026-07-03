@@ -50,19 +50,19 @@ class WorldConfig:
 
     dynamic_obstacles = [
         # Humans
-        {"def_name": "HUMAN_1", "amplitude": -8.5, "speed": 1, "axis": 'y'},
-        {"def_name": "HUMAN_2", "amplitude": 7.0, "speed": 1, "axis": 'x'},
-        {"def_name": "HUMAN_3", "amplitude": -14.0, "speed": 1, "axis": 'y'},
-        {"def_name": "HUMAN_4", "amplitude": -17.0, "speed": 1, "axis": 'x'},
-        {"def_name": "HUMAN_5", "amplitude": -6.0, "speed": 1, "axis": 'y'},
-        {"def_name": "HUMAN_6", "amplitude": 14.0, "speed": 1, "axis": 'x'},
-        {"def_name": "HUMAN_7", "amplitude": 8.0, "speed": 1, "axis": 'y'},
+        {"def_name": "HUMAN_1", "amplitude": -8.5, "speed": 0.25, "axis": 'y'},
+        {"def_name": "HUMAN_2", "amplitude": 7.0, "speed": 0.25, "axis": 'x'},
+        {"def_name": "HUMAN_3", "amplitude": -14.0, "speed": 0.25, "axis": 'y'},
+        {"def_name": "HUMAN_4", "amplitude": -17.0, "speed": 0.25, "axis": 'x'},
+        {"def_name": "HUMAN_5", "amplitude": -6.0, "speed": 0.25, "axis": 'y'},
+        {"def_name": "HUMAN_6", "amplitude": 14.0, "speed": 0.25, "axis": 'x'},
+        {"def_name": "HUMAN_7", "amplitude": 8.0, "speed": 0.25, "axis": 'y'},
         
         # Forklifts
-        {"def_name": "FORKLIFT_1", "amplitude": 13.0, "speed": 1.5, "axis": 'x'},
-        {"def_name": "FORKLIFT_2", "amplitude": 40.0, "speed": 1.5, "axis": 'x'},
-        {"def_name": "FORKLIFT_3", "amplitude": 13.0, "speed": 1.5, "axis": 'y'},
-        {"def_name": "FORKLIFT_4", "amplitude": -12.0, "speed": 1.5, "axis": 'y'},
+        {"def_name": "FORKLIFT_1", "amplitude": 13.0, "speed": 0.3, "axis": 'x'},
+        {"def_name": "FORKLIFT_2", "amplitude": 40.0, "speed": 0.3, "axis": 'x'},
+        {"def_name": "FORKLIFT_3", "amplitude": 13.0, "speed": 0.3, "axis": 'y'},
+        {"def_name": "FORKLIFT_4", "amplitude": -12.0, "speed": 0.3, "axis": 'y'},
     ]
 
 
@@ -71,6 +71,13 @@ class PhysicalConfig:
     wheel_base: float = 0.33            # (m)
     wheel_radius: float = 0.0975        # (m)
     max_wheel_speed: float = 12.3       # (rad/s)
+    lidar_height: float = 0.8           # (m)
+    camera_height: float = 1.2          # (m) mounting height above ground
+    camera_fov = 1.5                    # (radians)
+    camera_width_px = 640               # (pixels)
+    camera_height_px = 480              # (pixels)
+    lidar_max_range = 25.0              # (m)
+
 
 @dataclass(frozen=True)
 class PerceptionConfig:
@@ -78,7 +85,7 @@ class PerceptionConfig:
 
 @dataclass(frozen=True)
 class VisionConfig:
-    enable_object_detection = False
+    enable_object_detection = True
     yolo_model = "yolov8n.pt"
     yolo_thresh = 0.4
     
@@ -139,6 +146,44 @@ class GridPlanningConfig(LowLevelPlanningConfig):
     unknown_cost = 1.5
     padding_cost = 50.0
     heuristic_weight = 2
+
+@dataclass(frozen=True)
+class ObstacleTrackingConfig:
+    """Tunables for the moving-obstacle pipeline: cluster -> track -> label -> pad.
+    Pixel values refer to the local planning grid (GridPlanningConfig.grid_res)."""
+
+    # --- Clustering (grouping LiDAR hits into objects) ---
+    cluster_dilation_px = 1         # merges adjacent hits / closes 1-px gaps
+    cluster_min_pixels = 3          # blobs smaller than this are noise
+    cluster_max_radius_m = 2.5      # bigger blobs are wall fragments, not objects
+
+    # --- Tracking (following objects across frames) ---
+    assoc_gate_m = 1.0              # max match distance between track and new cluster
+    max_unseen_frames = 8           # frames a lost track coasts before deletion
+    min_frame_dt = 0.02             # (s) lower bound on frame delta
+    history_len = 20                # position samples kept per track (~2s at 10Hz)
+    velocity_min_samples = 3        # samples needed before estimating velocity
+    velocity_min_baseline_s = 0.15  # (s) minimum elapsed time for a velocity estimate
+    confirm_frames = 3              # sightings needed before a track is trusted
+    moving_speed_thresh = 0.15      # (m/s) faster than this counts as "moving"
+    heading_min_speed = 0.05        # (m/s) below this, heading is not updated
+
+    # --- YOLO labeling ---
+    label_stickiness = 0.85         # 0..1, higher = harder to flip an established label
+
+    # --- Padding (costmap inflation) ---
+    obstacle_padding_m = 0.9        # fixed MARGIN inflating the object's actual shape
+    prediction_lookahead_s = 1.0    # (s) shape stamped again this far ahead of moving obstacles
+
+    # --- Visualization ---
+    arrow_lookahead_s = 1.0         # (s) arrow length = predicted travel in this time
+    arrow_min_len_px = 14           # (display px) floor so slow motion is still visible
+    arrow_max_len_frac = 0.25       # cap as fraction of display size
+    arrow_color = (139, 0, 0)       # BGR dark blue
+    person_color = (255, 0, 255)    # BGR magenta
+    forklift_color = (0, 255, 255)  # BGR yellow
+    unknown_track_color = (255, 255, 0)  # BGR cyan
+
 
 @dataclass(frozen=True)
 class SectorPlanningConfig(LowLevelPlanningConfig):

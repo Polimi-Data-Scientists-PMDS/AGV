@@ -30,5 +30,3 @@ class Task:
         WorldConfig.goals["PICKUP_07"],          # Pickup point 7
         WorldConfig.goals["CHARGING_STATION"],   # Charging station
     ]
-
-WordConfig.goals[str]
