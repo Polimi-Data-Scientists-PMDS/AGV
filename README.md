@@ -2,17 +2,11 @@
 **PMDS x DevNut Autonomous Guided Vehicle Project**
 
 ## Table of Contents
-- [TODOs](#todos)
 - [Development Environment Setup](#development-environment-setup)
 - [Webots Configuration](#webots-configuration)
 - [Project Rules](#project-rules)
 - [Docker Database Setup](#docker-database-setup)
 - [Container Management](#container-management)
-
----
-
-## TODOs
-Please refer to [TODO.md](./TODO.md) for the active list of project tasks and milestones.
 
 ---
 
