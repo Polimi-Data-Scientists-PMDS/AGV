@@ -128,30 +128,79 @@ class AGVSimulation:
             self.logger.save_to_database()
             print("Log saved to database successfully!")
 
+            goals_config_path = os.path.join(
+                os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")),
+                "web-app",
+                "src",
+                "goals.config.json",
+            )
+            with open(goals_config_path, "w", encoding="utf-8") as goals_config_file:
+                goals_config_file.write("""{
+    "Goals": [
+        {
+            "name": "CHARGING_STATION",
+            "coordinates": [6.75, -4.5]
+        },
+        {
+            "name": "DROPOFF_01",
+            "coordinates": [-29.3, 4]
+        },
+        {
+            "name": "PICKUP_01",
+            "coordinates": [-24, 3.5]
+        },
+        {
+            "name": "PICKUP_02",
+            "coordinates": [-18.5, 6.25]
+        },
+        {
+            "name": "PICKUP_03",
+            "coordinates": [-13.5, 6.25]
+        },
+        {
+            "name": "PICKUP_04",
+            "coordinates": [-8.25, 4.5]
+        },
+        {
+            "name": "PICKUP_05",
+            "coordinates": [-2, 5.75]
+        },
+        {
+            "name": "PICKUP_06",
+            "coordinates": [3.75, 5.75]
+        },
+        {
+            "name": "PICKUP_07",
+            "coordinates": [18.75, 2.25]
+        }
+    ]
+}
+""")
+
     def __init_logger(self):
         """Initializes and starts the custom RobotLog."""
         log_file_path = os.path.join(LOGS_DIR, "robot_controller_runs.jsonl")
-        logger = RobotLog(log_file_path, controller_version="v1")
+        logger = RobotLog(log_file_path, unit_id="1")
         logger.start(self.hardware.get_time())
         return logger
 
     def __get_updated_goal(self, current_time, state):
         """Checks distance to goal and loads the next one if reached."""
         # Calculate using the state from the PREVIOUS simulation tick
-        goal = Position(*self.task.goal_positions[self.goal_index])
+        goal = Position(*self.task.get_goal(self.goal_index))
         dist_e, heading_e = calculate_control_errors(state, goal)
         
         if dist_e < self.planning_config.goal_reached_thresh:
             self.logger.log_target_reached(
                 current_time, 
                 target_index=self.goal_index, 
-                target=self.task.goal_positions[self.goal_index]
+                target=self.task.get_goal(self.goal_index)
             )
             print("GOAL REACHED!")
             
             # Load next goal
-            self.goal_index = (self.goal_index + 1) % len(self.task.goal_positions)
-            goal = Position(*self.task.goal_positions[self.goal_index])
+            self.goal_index = (self.goal_index + 1) % self.task.num_goals()
+            goal = Position(*self.task.get_goal(self.goal_index))
         
         return goal
 
@@ -186,36 +235,6 @@ class AGVSimulation:
         # # print(f"\nRobot velocities:\n  Linear : {lin_vel:.2f} m/s\n  Angular: {ang_vel:.2f} rad/s")
         # print("="*40)
 
-def launch_dashboard():
-    import socket
-    import subprocess
-    import os
-    import sys
-    import webbrowser
-    import urllib.request
-
-    dashboard_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "web-app", "app.py"))
-    
-    # Check if port 8501 is in use
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        in_use = s.connect_ex(('localhost', 8501)) == 0
-        
-    if not in_use:
-        print("Starting Streamlit Dashboard on port 8501...")
-        # Streamlit automatically opens a browser tab when it first runs
-        subprocess.Popen([sys.executable, "-m", "streamlit", "run", dashboard_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    else:
-        print("Dashboard appears to be running on port 8501. Opening browser...")
-        
-        # Verify it's actually responding, then open the browser window
-        try:
-            urllib.request.urlopen("http://localhost:8501/_stcore/health", timeout=2)
-            webbrowser.open("http://localhost:8501")
-        except Exception:
-            # Even if health check fails, open it just in case
-            webbrowser.open("http://localhost:8501")
-
 if __name__ == "__main__":
-    launch_dashboard()
     app = AGVSimulation()
     app.run()
