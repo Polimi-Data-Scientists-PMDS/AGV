@@ -1,0 +1,23 @@
+\babel@toc {english}{}\relax 
+\contentsline {section}{\numberline {1}Current Controller}{2}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Architecture}{2}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Planning and Control}{2}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Observed Behaviour}{2}{subsection.1.3}%
+\contentsline {section}{\numberline {2}Previous Controller Iterations}{2}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Initial Approach}{2}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Lessons Learned}{2}{subsection.2.2}%
+\contentsline {section}{\numberline {3}Logging Infrastructure}{2}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Service Architecture}{3}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Data Model}{3}{subsection.3.2}%
+\contentsline {paragraph}{Simulations.}{4}{section*.2}%
+\contentsline {paragraph}{Events.}{4}{section*.3}%
+\contentsline {paragraph}{EventTelemetry.}{5}{section*.4}%
+\contentsline {subsection}{\numberline {3.3}Data Flow and Controller Integration}{5}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Validation and Transactional Integrity}{6}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}JSONL Mirror and Dashboard Integration}{7}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Reliability Considerations}{7}{subsection.3.6}%
+\contentsline {subsection}{\numberline {3.7}Use in Evaluation}{8}{subsection.3.7}%
+\contentsline {section}{\numberline {4}Web Application}{8}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Interface Design}{8}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Data Integration}{8}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Practical Value and Limitations}{8}{subsection.4.3}%
