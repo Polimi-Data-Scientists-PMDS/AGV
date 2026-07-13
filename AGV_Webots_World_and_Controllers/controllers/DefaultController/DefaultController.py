@@ -1,240 +1,151 @@
-import os
 import sys
 
-from config import WorldConfig, PlanningConfig, LogConfig, LOGGER_DIR, LOGS_DIR
-from task import Task
+from config import LogConfig, LOGGER_DIR, PlanningConfig, WorldConfig
+from task import GoalConfigurationError, Task
 
 if LOGGER_DIR not in sys.path:
     sys.path.append(LOGGER_DIR)
 
+from control.control import Control, ControlCommand, MovingObstacleSafetyLimiter
 from hardware.hardware_interface import HardwareInterface
 from hardware.webots_interface import WebotsInterface
-from perception.perception import Perception, SensorData
 from localization.localization import Localization, Position, RobotState
-
-
-from planning.planning import Path, GlobalMap
+from perception.perception import Perception, SensorData
 from planning.high_level.planning_interface import HighLevelPlanner
 from planning.low_level.planning_interface import LowLevelPlanner
-
-from control.control import Control, ControlCommand
-
-from webots.dynamic_environment import DynamicEnvironment
+from planning.planning import GlobalMap, Path
+from robot_identity import parse_robot_unit_id
+from robot_log import RobotLog
 from utils.utils import calculate_control_errors
-from robot_log import RobotLog 
 
-# from planning.grid_obstacle_avoidance import GridObstacleAvoider
-# from navigation.sector_obstacle_avoidance import SectorObstacleAvoider
-#from perception.vision import ObjectDetector 
-# from AGV_Webots_World_and_Controllers.controllers.DefaultController.control.OLD_kinematics import KinematicsController
 
 class AGVSimulation:
     def __init__(self):
-        # Configuration & Hardware
-        self.task = Task()
+        # Webots must exist before the unit-specific task, logger, or image writers.
+        self.hardware: HardwareInterface = WebotsInterface()
+        self.unit_id = parse_robot_unit_id(self.hardware.get_robot_name())
+        self.operational = False
+        self.task = None
+        self.logger = None
+
+        if self.unit_id is None:
+            self._refuse_to_run(
+                f"invalid robot name {self.hardware.get_robot_name()!r}; "
+                "expected PIONEER_3_<number>"
+            )
+            return
+
+        try:
+            self.task = Task(self.unit_id)
+        except GoalConfigurationError as exc:
+            self._refuse_to_run(str(exc))
+            return
+
         self.planning_config = PlanningConfig()
         self.log_config = LogConfig()
+        self.global_map = GlobalMap(WorldConfig.fixed_obstacles)
 
-        # Data
-        self.global_map: GlobalMap = GlobalMap(WorldConfig.fixed_obstacles)
+        self.logger = RobotLog(self.log_config.server_url, self.unit_id)
+        if not self.logger.start(self.hardware.get_time()):
+            self._refuse_to_run("logging service startup failed")
+            return
 
-        # Modules
-        self.hardware:      HardwareInterface   = WebotsInterface()
-        self.logger:        RobotLog            = self.__init_logger()
-        self.perception:    Perception          = Perception(self.hardware)
-        self.localization:  Localization        = Localization()
-        self.hl_planning:   HighLevelPlanner    = Task.hl_planner_class(self.logger, self.global_map)
-        self.ll_planning:   LowLevelPlanner     = Task.ll_planner_class(
-                                                        self.logger, 
-                                                        self.hardware.lidar.get_specs(), 
-                                                        self.global_map)
-        self.control:       Control             = Control()
+        self.perception: Perception = Perception(self.hardware, self.unit_id)
+        self.localization: Localization = Localization()
+        self.hl_planning: HighLevelPlanner = Task.hl_planner_class(self.logger, self.global_map)
+        self.ll_planning: LowLevelPlanner = Task.ll_planner_class(
+            self.logger,
+            self.hardware.lidar.get_specs(),
+            self.global_map,
+            self.unit_id,
+        )
+        self.control: Control = Control()
+        self.safety_limiter = MovingObstacleSafetyLimiter()
 
-
-
-        # Environment
-        self.environment = DynamicEnvironment(self.hardware.robot)
-        
-        # Initial Goal
         self.goal_index = 0
-
-        # Timers
-        self.last_print_time = 0.0
         self.last_db_save = 0.0
+        self.operational = True
+
+    def _refuse_to_run(self, reason):
+        print(f"Controller refusing to move: {reason}")
+        self.hardware.motors.stop()
 
     def run(self):
-        """The main simulation execution loop."""
-        
-        # Initialize variables for the first console print
-        # dist_e, heading_e = self.state.calculate_errors(self.current_goal)
-        # lin_vel, ang_vel = 0.0, 0.0
-        
-        try:
-            prev_state = self.localization.initial_state()
+        """Run one independent robot controller process."""
+        if not self.operational:
+            return
 
+        try:
+            prev_state = self.localization.initial_state(
+                self.hardware.gps.get_initial_position(),
+                self.hardware.inertial_unit.get_yaw(),
+            )
             while self.hardware.is_alive():
                 current_time = self.hardware.get_time()
-                
-                # --- UPDATE ENVIRONMENT ---
-                self.environment.update_all(current_time)
-                
-                # ---------------------------------------------------------------
-                # --- 1. PERCEPTION ---
+
+                # Exactly one validated task snapshot is used throughout this cycle.
+                self.goal_index = self.task.refresh(self.goal_index)
+
                 sensor_data: SensorData = self.perception.perceive(current_time)
-
-                # --- 2. LOCALIZATION ---
                 state: RobotState = self.localization.localize(prev_state, sensor_data)
-                prev_state: RobotState = state.copy()
+                prev_state = state.copy()
 
-                # --- 3. PLANNING ---
                 goal: Position = self.__get_updated_goal(current_time, state)
                 hl_path: Path = self.hl_planning.plan(state, goal)
                 ll_goal = hl_path.waypoints[0]
-                ll_path: Path = self.ll_planning.plan(state, ll_goal, sensor_data)
-
-                # --- 4. CONTROL ---
+                is_final_goal = (
+                    abs(ll_goal.x - goal.x) < 1e-9
+                    and abs(ll_goal.y - goal.y) < 1e-9
+                )
+                ll_path: Path = self.ll_planning.plan(
+                    state,
+                    ll_goal,
+                    sensor_data,
+                    allow_goal_in_padding=is_final_goal,
+                )
                 command: ControlCommand = self.control.follow_path(state, ll_path)
-                
-                # --- 5. ACTUATION ---
+                command = self.safety_limiter.limit(
+                    command, self.ll_planning.safety_status, current_time
+                )
+
                 self.hardware.motors.apply_command(command)
-                # ---------------------------------------------------------------
 
-
-                # --- PRINT AND LOG  ---
-                if self.__should_print_and_log(current_time):
-                    self.__print_and_log_data(current_time, sensor_data, state, goal, ll_path, command)
-                    self.last_print_time = current_time
-                else: 
-                    self.logger.log_realtime(sensor_data, state, goal, command, ll_path.waypoints[0] if len(ll_path.waypoints) > 0 else None) 
-                # --- UPDATE LOGGGER STATE  ---
-                # TODO: add `has_obstacle` to the path object
-                # self.logger.update_obstacle_state(current_time, path.has_obstacle, sensor_data)
-                self.logger.update_obstacle_state(current_time, False, sensor_data)
+                next_point = ll_path.waypoints[0] if ll_path.waypoints else None
+                self.logger.capture_telemetry(sensor_data, state, goal, command, next_point)
+                self.logger.update_obstacle_state(
+                    current_time,
+                    self.ll_planning.safety_status.has_moving_obstacle,
+                    sensor_data,
+                )
                 self.logger.update_idle_state(current_time, state)
-                # --- UPDATE DATABASE ---
-                if self.__should_save_to_database(current_time):
-                    print("5s passed, saving log...")
-                    self.logger.save()
-                    self.logger.save_to_database()
+
+                if self.__should_flush(current_time):
+                    print(f"Unit {self.unit_id}: saving logging batch...")
+                    self.logger.flush()
                     self.last_db_save = current_time
-                
-
-
         finally:
-            print("Controller stopped, saving log...")
-            self.logger.log_event(self.hardware.get_time(), "STOP", "Controller stopped")
+            print(f"Unit {self.unit_id}: controller stopped, flushing logging data...")
             self.hardware.motors.stop()
-            self.logger.save()
-            self.logger.save_to_database()
-            print("Log saved to database successfully!")
-
-            goals_config_path = os.path.join(
-                os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")),
-                "web-app",
-                "src",
-                "goals.config.json",
-            )
-            with open(goals_config_path, "w", encoding="utf-8") as goals_config_file:
-                goals_config_file.write("""{
-    "Goals": [
-        {
-            "name": "CHARGING_STATION",
-            "coordinates": [6.75, -4.5]
-        },
-        {
-            "name": "DROPOFF_01",
-            "coordinates": [-29.3, 4]
-        },
-        {
-            "name": "PICKUP_01",
-            "coordinates": [-24, 3.5]
-        },
-        {
-            "name": "PICKUP_02",
-            "coordinates": [-18.5, 6.25]
-        },
-        {
-            "name": "PICKUP_03",
-            "coordinates": [-13.5, 6.25]
-        },
-        {
-            "name": "PICKUP_04",
-            "coordinates": [-8.25, 4.5]
-        },
-        {
-            "name": "PICKUP_05",
-            "coordinates": [-2, 5.75]
-        },
-        {
-            "name": "PICKUP_06",
-            "coordinates": [3.75, 5.75]
-        },
-        {
-            "name": "PICKUP_07",
-            "coordinates": [18.75, 2.25]
-        }
-    ]
-}
-""")
-
-    def __init_logger(self):
-        """Initializes and starts the custom RobotLog."""
-        log_file_path = os.path.join(LOGS_DIR, "robot_controller_runs.jsonl")
-        logger = RobotLog(log_file_path, unit_id="1")
-        logger.start(self.hardware.get_time())
-        return logger
+            self.logger.stop(self.hardware.get_time())
 
     def __get_updated_goal(self, current_time, state):
-        """Checks distance to goal and loads the next one if reached."""
-        # Calculate using the state from the PREVIOUS simulation tick
         goal = Position(*self.task.get_goal(self.goal_index))
-        dist_e, heading_e = calculate_control_errors(state, goal)
-        
+        dist_e, _ = calculate_control_errors(state, goal)
+
         if dist_e < self.planning_config.goal_reached_thresh:
             self.logger.log_target_reached(
-                current_time, 
-                target_index=self.goal_index, 
-                target=self.task.get_goal(self.goal_index)
+                current_time,
+                target_index=self.goal_index,
+                target=self.task.get_goal(self.goal_index),
             )
-            print("GOAL REACHED!")
-            
-            # Load next goal
+            print(f"Unit {self.unit_id}: goal reached")
             self.goal_index = (self.goal_index + 1) % self.task.num_goals()
             goal = Position(*self.task.get_goal(self.goal_index))
-        
         return goal
 
-    def __should_save_to_database(self, current_time):
+    def __should_flush(self, current_time):
         return current_time - self.last_db_save >= self.log_config.log_interval
 
-    def __should_print_and_log(self, current_time):
-        return current_time - self.last_print_time >= self.log_config.print_interval
-
-    def __print_and_log_data(self, current_time, sensor_data, state, goal, path, command):
-        next_point = path.waypoints[0] if len(path.waypoints) > 0 else None
-        self.logger.log_realtime(sensor_data, state, goal, command, next_point)
-        
-        # COMMENT PRINTS TO USE DASHBOARD
-
-        # print("="*40)
-        # # status = "GOAL REACHED!" if dist_e < self.config.GOAL_REACHED_THRESH else "MOVING..."
-        # # print(f"Status: {status}")
-        # print(f"Time: {current_time:.2f}s\n ")
-        # print("---")
-        # print(f"\nState:\t\t\t  x: {state.x:.2f} m\t  y: {state.y:.2f} m\t  th: {state.theta:.2f} rad")
-        # print(f"\nVel:\t\t\t  v: {state.v:.2f} m/s\t  w: {state.omega:.2f} rad/s")
-        # print("---")
-        # print(f"\nNext:\t\t\t  " + f"x: {next_point.x:.1f} m\t  y: {next_point.y:.1f} m" if next_point is not None else "None")
-        # print(f"\nGoal:\t\t\t  x: {goal.x:.1f} m\t  y: {goal.y:.1f} m")
-        # print("---")
-        # print(f"\nControl command:")
-        # print(f"\t\t\t  r: {command.rho:.1f} m\t  alp: {command.alpha:.2f} rad")
-        # print(f"\t\t\t  v: {command.v:.1f} m/s\t  w: {command.omega:.2f} rad/s")
-        # print(f"\t\t\t  w_l: {command.w_l:.1f}\t  w_r: {command.w_r:.2f}")
-
-        # # print(f"\nRobot velocities:\n  Linear : {lin_vel:.2f} m/s\n  Angular: {ang_vel:.2f} rad/s")
-        # print("="*40)
 
 if __name__ == "__main__":
-    app = AGVSimulation()
-    app.run()
+    AGVSimulation().run()

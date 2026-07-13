@@ -7,6 +7,7 @@ class HardwareInterface(ABC):
 
         self.motors = None
         self.gps = None
+        self.inertial_unit = None
         self.lidar = None
         self.camera = None
     
@@ -16,4 +17,8 @@ class HardwareInterface(ABC):
 
     @abstractmethod
     def get_time(self):
+        pass
+
+    @abstractmethod
+    def get_robot_name(self):
         pass

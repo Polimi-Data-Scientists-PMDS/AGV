@@ -1,18 +1,21 @@
 class GPS:
-    """Handles GPS coordinate tracking and origin normalization."""
+    """Provides absolute world coordinates and the recorded startup position."""
     def __init__(self, robot, timestep):
         self.gps = robot.getDevice('gps')
         self.gps.enable(timestep)
-        self.initial_state = None
+        self.initial_position = None
 
     def calibrate_origin(self):
-        """Must be called AFTER the first simulation step to lock in starting coordinates."""
-        self.initial_state = self.gps.getValues()
+        """Record the absolute spawn position after the first simulation step."""
+        x, y, _ = self.gps.getValues()
+        self.initial_position = (x, y)
         print("GPS set up and calibrated correctly!")
+
+    def get_initial_position(self):
+        if self.initial_position is None:
+            raise RuntimeError("GPS startup position has not been calibrated")
+        return self.initial_position
 
     def get_position(self):
         x, y, _ = self.gps.getValues()
-        if self.initial_state:
-            x -= self.initial_state[0]
-            y -= self.initial_state[1]
         return x, y

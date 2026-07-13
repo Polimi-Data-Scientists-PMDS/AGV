@@ -72,19 +72,25 @@ To link your Python virtual environment with Webots:
 After Webots is configured with the project Python interpreter:
 
 1. Make sure the Python environment has been created with `./setup.sh` or the manual setup steps above.
-2. If you want simulation data saved to MySQL, make sure the `agv-logger` Docker container is running before starting the simulation.
-3. Open Webots.
-4. From Webots, open the world file:
+2. Start the `agv-logger` MySQL container.
+3. Start the standalone logging service in a separate terminal. Both robot controllers use this one service, and they refuse to move if it cannot create their simulation records after ten attempts:
+   ```bash
+   .venv/bin/python logging/logging_server.py
+   ```
+   The service listens on `127.0.0.1:8080` by default. Use `--host` and `--port` to override the listener, and set `LOGGING_SERVER_URL` to the matching URL for the robot controllers.
+4. Open Webots.
+5. From Webots, open the world file:
    ```text
    AGV_Webots_World_and_Controllers/worlds/AGV_Warehouse_World.wbt
    ```
-5. Confirm that the AGV robot in the world is using the `DefaultController` controller. The checked-in world file is already configured with:
+6. Confirm that each AGV robot is named `PIONEER_3_<number>` and uses the `DefaultController` controller. Routes are configured in `AGV_Webots_World_and_Controllers/controllers/DefaultController/goals.config.json`.
    ```text
    controller "DefaultController"
    ```
-6. Press the Webots run/play control to start the simulation.
-7. Keep Webots open while monitoring the AGV. The controller produces telemetry and log files that the dashboards read while the simulation is running.
-8. To monitor the React dashboard at the same time, start it separately from another terminal:
+7. Confirm the checked-in `DYNAMIC_ENVIRONMENT_SUPERVISOR` node uses the `DynamicEnvironmentSupervisor` controller so only that process moves humans and forklifts.
+8. Press the Webots run/play control to start the simulation.
+9. Keep Webots open while monitoring the AGVs. The logging service rebuilds the dashboard JSONL mirrors from committed MySQL rows after each successful transaction.
+10. To monitor the React dashboard at the same time, start it separately from another terminal:
    ```bash
    cd web-app
    npm run dev

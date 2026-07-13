@@ -9,6 +9,7 @@ DEFAULT_CONTROLLER_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(DEFAULT_CONTROLLER_DIR, "..", "..", ".."))
 LOGGER_DIR = os.path.join(PROJECT_ROOT, "logging", "logger")
 LOGS_DIR = os.path.join(PROJECT_ROOT, "logging", "logs")
+LOGGING_SERVER_URL = os.getenv("LOGGING_SERVER_URL", "http://127.0.0.1:8080")
 
 @dataclass(frozen=True)
 class WorldConfig:
@@ -55,6 +56,7 @@ class WorldConfig:
 class PhysicalConfig:
     wheel_base: float = 0.33            # (m)
     wheel_radius: float = 0.0975        # (m)
+    footprint_radius: float = 0.25      # (m) conservative circular robot footprint
     max_wheel_speed: float = 12.3       # (rad/s)
     lidar_height: float = 0.8           # (m)
     camera_height: float = 1.2          # (m) mounting height above ground
@@ -67,6 +69,14 @@ class PhysicalConfig:
 @dataclass(frozen=True)
 class PerceptionConfig:
     encoder_thresh = 1e-5
+
+
+@dataclass(frozen=True)
+class LocalizationConfig:
+    gps_weight: float = 0.25
+    yaw_weight: float = 0.25
+    position_snap_threshold_m: float = 0.5
+    yaw_snap_threshold_rad: float = 0.261799  # 15 degrees
 
 @dataclass(frozen=True)
 class VisionConfig:
@@ -84,15 +94,15 @@ class ControlConfig:
 
 @dataclass(frozen=True)
 class PlanningConfig:
-    goal_reached_thresh = 1
+    goal_reached_thresh = 0.25
     global_map_res = 0.2
     world_width = 80.0   # (m) Total width of your simulated/real world
     world_height = 80.0  # (m) Total height of your simulated/real world
-    tolerance_m = 0.4    # (m) How close a LiDAR hit can be to a wall to 
+    tolerance_m = 0.1    # (m) map-matching tolerance for known wall LiDAR hits
 
 @dataclass(frozen=True)
 class HighLevelPlanningConfig(PlanningConfig):
-    goal_reached_thresh = 1
+    goal_reached_thresh = 0.25
     collision_distance = 0.25
 
 @dataclass(frozen=True)
@@ -102,7 +112,7 @@ class VisGraphPlanningConfig(HighLevelPlanningConfig):
     
 @dataclass(frozen=True)
 class LowLevelPlanningConfig(PlanningConfig):
-    goal_reached_thresh = 1
+    goal_reached_thresh = 0.25
     collision_distance = 0.25
     
 @dataclass(frozen=True)
@@ -151,6 +161,7 @@ class ObstacleTrackingConfig:
     velocity_min_baseline_s = 0.15  # (s) minimum elapsed time for a velocity estimate
     confirm_frames = 3              # sightings needed before a track is trusted
     moving_speed_thresh = 0.15      # (m/s) faster than this counts as "moving"
+    recently_moving_retention_s = 1.5  # (s) keep motion status through brief stops
     heading_min_speed = 0.05        # (m/s) below this, heading is not updated
 
     # --- YOLO labeling ---
@@ -171,6 +182,15 @@ class ObstacleTrackingConfig:
 
 
 @dataclass(frozen=True)
+class MovingObstacleSafetyConfig:
+    slowdown_clearance_m: float = 2.0
+    slowdown_speed_mps: float = 0.08
+    stop_clearance_m: float = 0.8
+    release_clearance_m: float = 1.4
+    minimum_stop_hold_s: float = 1.5
+
+
+@dataclass(frozen=True)
 class SectorPlanningConfig(LowLevelPlanningConfig):
     num_sectors = 32
     padding = 3
@@ -183,6 +203,4 @@ class SectorPlanningConfig(LowLevelPlanningConfig):
 class LogConfig:
     log_interval = 5.0      # s
     print_interval = 0.5    # s
-
-
-
+    server_url = LOGGING_SERVER_URL

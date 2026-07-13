@@ -23,8 +23,9 @@ class Detection:
 
 
 class ObjectDetector:
-    def __init__(self):
+    def __init__(self, unit_id):
         self.config = VisionConfig()
+        self.unit_id = str(unit_id)
 
         print("Loading YOLOv8 AI Model (this might take a few seconds)...")
         # 'yolov8n.pt' is the "Nano" version. It is incredibly fast and lightweight.
@@ -81,7 +82,10 @@ class ObjectDetector:
         # 3. Save the live video feed to disk
         # Save the frame to disk so the Streamlit dashboard can access it
         os.makedirs(LOGS_DIR, exist_ok=True)
-        cv2.imwrite(os.path.join(LOGS_DIR, "camera_feed.jpg"), annotated_frame)
+        cv2.imwrite(
+            os.path.join(LOGS_DIR, f"camera_feed_{self.unit_id}.jpg"),
+            annotated_frame,
+        )
         
         # Convert ultralytics Boxes into simple Detection records so downstream
         # code (YoloLabeler) doesn't depend on the ultralytics API.

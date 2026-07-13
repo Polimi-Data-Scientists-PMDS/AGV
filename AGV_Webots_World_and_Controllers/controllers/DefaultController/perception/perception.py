@@ -8,20 +8,21 @@ class SensorData:
         self.dt = None
         self.wheels_delta = (None, None)    # (dL, dR)
         self.gps = (None, None)             # (x, y)
+        self.yaw = None                     # absolute world-frame heading (rad)
         self.pointcloud = None
         self.image = None
         self.detections = None
 
 
 class Perception:
-    def __init__(self, hardware: HardwareInterface):
+    def __init__(self, hardware: HardwareInterface, unit_id: str):
         self.vision_config = VisionConfig()
         self.hardware = hardware
         self.__last_time = None
 
         self.object_detection = None
         if self.vision_config.enable_object_detection:
-            self.object_detection = ObjectDetector()
+            self.object_detection = ObjectDetector(unit_id)
 
     def perceive(self, current_time) -> SensorData:
         data = SensorData(current_time)
@@ -29,6 +30,7 @@ class Perception:
         data.dt =  self.__get_dt(current_time)
         data.wheels_delta = self.hardware.motors.get_deltas()
         data.gps = self.hardware.gps.get_position()
+        data.yaw = self.hardware.inertial_unit.get_yaw()
         data.pointcloud = self.hardware.lidar.read_scan()
         data.image = self.hardware.camera.get_image()
 

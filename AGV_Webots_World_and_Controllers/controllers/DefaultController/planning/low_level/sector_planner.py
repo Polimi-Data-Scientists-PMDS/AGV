@@ -21,7 +21,13 @@ class SectorPlanner(LowLevelPlanner):
         self.locked_space = None
         self.is_escaping_dead_end = False
 
-    def plan(self, state:RobotState, goal:Position, sensor_data:SensorData) -> Path:
+    def plan(
+        self,
+        state: RobotState,
+        goal: Position,
+        sensor_data: SensorData,
+        allow_goal_in_padding: bool = False,
+    ) -> Path:
         pointcloud = sensor_data.pointcloud
 
         # --- 0. COLLISION DETECTION ---

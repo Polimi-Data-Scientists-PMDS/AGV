@@ -1,27 +1,22 @@
-import os
 import json
-import mysql.connector
+import time
+import urllib.error
+import urllib.request
+
+
+DEFAULT_SERVER_URL = "http://127.0.0.1:8080"
+
 
 class RobotLog:
-    def __init__(self, log_file_path, unit_id="unknown"):
-        # TODO: remove self.log_file_path once the database is verified working
-        self.log_file_path = log_file_path
-        self.realtime_log_file_path = log_file_path.replace(".jsonl", "_realtime.jsonl") if log_file_path.endswith(".jsonl") else log_file_path + "_realtime.jsonl"
-        self.realtime_panel = log_file_path.replace(".jsonl", "_realtime_panel.jsonl") if log_file_path.endswith(".jsonl") else log_file_path + "_realtime_panel.jsonl"
-        
-        # clear the realtime log file on start
-        log_dir = os.path.dirname(self.realtime_log_file_path)
-        if log_dir:
-            os.makedirs(log_dir, exist_ok=True)
-        with open(self.realtime_log_file_path, "w", encoding="utf-8") as f:
-            pass
+    """Controller-side event collector and HTTP persistence client."""
 
-        # Ensure the realtime panel file exists before the first START event is logged.
-        # It is read by log_event() even before the first sensor frame is available.
-        with open(self.realtime_panel, "w", encoding="utf-8") as f:
-            f.write("{}\n")
+    def __init__(self, server_url=DEFAULT_SERVER_URL, unit_id="unknown", request_fn=None, sleep_fn=None):
+        self.server_url = server_url.rstrip("/")
+        self.unit_id = str(unit_id)
+        self._request_fn = request_fn
+        self._sleep = sleep_fn or time.sleep
 
-        self.unit_id = unit_id
+        self.sim_id = None
         self.start_time = None
         self.last_time = None
         self.total_time = 0.0
@@ -30,242 +25,115 @@ class RobotLog:
         self.event_count = 0
         self.events = []
         self.event_telemetry = []
+        self.failed_events = []
+        self.failed_event_telemetry = []
+        self.latest_telemetry = self._empty_telemetry()
         self.is_idle = False
         self.in_obstacle_state = False
-
-        # Replace credentials/db with env variables or standard defaults as necessary
-        self.db_host = os.getenv("DB_HOST", "127.0.0.1")
-        self.db_port = int(os.getenv("DB_PORT", 3306))
-        self.db_user = os.getenv("DB_USER", "root")
-        self.db_password = os.getenv("DB_PASSWORD", "agv_pass") # Updated to match your docker container
-        self.db_name = os.getenv("DB_NAME", "agv_data")
-        self.sim_id = self._next_local_sim_id()
-
-        conn = None
-        cursor = None
-        try:
-            conn = mysql.connector.connect(
-                host=self.db_host,
-                port=self.db_port,
-                user=self.db_user,
-                password=self.db_password,
-                database=self.db_name
-            )
-            cursor = conn.cursor()
-
-            # Setup database simulations
-            insert_query_simulations = """
-                    INSERT INTO Simulations (
-                        unit_id, total_sim_time, obstacle_count, total_idle_time, event_count
-                    ) VALUES (%s, %s, %s, %s, %s)
-                """
-            cursor.execute(insert_query_simulations, (
-                    self.unit_id,
-                    self._seconds_to_mysql_time(0.0),
-                    self.obstacle_count,
-                    self._seconds_to_mysql_time(0.0),
-                    self.event_count
-                ))
-            conn.commit()
-            print("Successfully saved simulation summary to the database.")
-            
-            self.sim_id = cursor.lastrowid
-            print(f"Saved sim_id={self.sim_id}")
-
-        except Exception as e:
-            print(f"Failed to initialize database entry for simulation: {e}")
-        finally:
-            if cursor is not None:
-                try: cursor.close()
-                except Exception: pass
-            if conn is not None and conn.is_connected():
-                try: conn.close()
-                except Exception: pass
-
-
-        # Write the initial simulation line to the dashboard JSONL.
-        self._update_simulation()
-
-    # Dashboard JSONL helpers (mirror of MySQL data for real-time dashboard display)
-
-    @property
-    def _jsonl_dir(self):
-        return os.path.dirname(self.log_file_path) or "."
-
-    def _next_local_sim_id(self):
-        #Use negative ids when MySQL does not create a simulation row.
-        path = os.path.join(self._jsonl_dir, "simulations.jsonl")
-        ids = []
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.strip():
-                        sim_id = json.loads(line).get("id")
-                        if isinstance(sim_id, int):
-                            ids.append(sim_id)
-        except (FileNotFoundError, json.JSONDecodeError):
-            pass
-
-        negative_ids = [sim_id for sim_id in ids if sim_id < 0]
-        return min(negative_ids, default=0) - 1
-
-    def _update_simulation(self):
-    
-        #Overwrites the line for the current sim_id in simulations.jsonl.
-        #If no line exists yet for this sim_id (first call from __init__),
-        #a new line is appended. All previous simulation lines are preserved.
-        (
-            total_sim_time,
-            obstacle_count,
-            total_idle_time,
-            event_count,
-            sim_id,
-        ) = (
-            self._seconds_to_mysql_time(self.total_time),
-            self.obstacle_count,
-            self._seconds_to_mysql_time(self.idle_time),
-            self.event_count,
-            self.sim_id
-        )
-        
-        record = {
-            "id": sim_id,
-            "unit_id": self.unit_id,
-            "total_sim_time": total_sim_time,
-            "obstacle_count": obstacle_count,
-            "total_idle_time": total_idle_time,
-            "event_count": event_count,
-        }
-        path = os.path.join(self._jsonl_dir, "simulations.jsonl")
-        os.makedirs(self._jsonl_dir, exist_ok=True)
-
-        existing = []
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                existing = [json.loads(line) for line in f if line.strip()]
-        except FileNotFoundError:
-            pass
-
-        replaced = False
-        for i, row in enumerate(existing):
-            if row.get("id") == sim_id:
-                existing[i] = record
-                replaced = True
-                break
-        if not replaced:
-            existing.append(record)
-
-        with open(path, "w", encoding="utf-8") as f:
-            for row in existing:
-                f.write(json.dumps(row) + "\n")
-
-    def _append_event(self):
-        #Appends pending event lines to events.jsonl when data is saved.
-        if not self.events:
-            return
-
-        path = os.path.join(self._jsonl_dir, "events.jsonl")
-        os.makedirs(self._jsonl_dir, exist_ok=True)
-        with open(path, "a", encoding="utf-8") as f:
-            for sim_id, sim_time, event_type, details in self.events:
-                record = {
-                    "sim_id": sim_id,
-                    "sim_time": self._seconds_to_mysql_time(sim_time),
-                    "e_type": event_type,
-                    "details": details,
-                }
-                f.write(json.dumps(record) + "\n")
-
-    def _append_telemetry(self):
-        #Appends pending telemetry lines to event_telemetry.jsonl when data is saved.
-        if not self.event_telemetry:
-            return
-
-        path = os.path.join(self._jsonl_dir, "event_telemetry.jsonl")
-        os.makedirs(self._jsonl_dir, exist_ok=True)
-        with open(path, "a", encoding="utf-8") as f:
-            for (
-                sim_id, event_time, event_type,
-                state_x, state_y, state_theta,
-                gps_x, gps_y,
-                error_distance, error_heading,
-                current_vel_linear, current_vel_angular,
-                target_vel_linear, target_vel_angular,
-                next_point_x, next_point_y,
-            ) in self.event_telemetry:
-                record = {
-                    "sim_id": sim_id,
-                    "event_time": self._seconds_to_mysql_time(event_time),
-                    "e_type": event_type,
-                    "state_x": state_x, "state_y": state_y, "state_theta": state_theta,
-                    "gps_x": gps_x, "gps_y": gps_y,
-                    "error_distance": error_distance, "error_heading": error_heading,
-                    "current_vel_linear": current_vel_linear, "current_vel_angular": current_vel_angular,
-                    "target_vel_linear": target_vel_linear, "target_vel_angular": target_vel_angular,
-                    "next_point_x": next_point_x, "next_point_y": next_point_y,
-                }
-                f.write(json.dumps(record) + "\n")
+        self._stopped = False
 
     @staticmethod
-    def _seconds_to_mysql_time(seconds):
-        total_microseconds = max(0, int(round(seconds * 1_000_000)))
-        hours, remainder = divmod(total_microseconds, 3_600_000_000)
-        minutes, remainder = divmod(remainder, 60_000_000)
-        secs, micros = divmod(remainder, 1_000_000)
-        return f"{hours:02d}:{minutes:02d}:{secs:02d}.{micros:06d}"
-
-    def start(self, sim_time):
-        self.start_time = sim_time
-        self.last_time = sim_time
-        self.log_event(sim_time, "START", "Controller started")
-
-    def log_realtime(self, sensor_data, state, goal, command, next_point=None):
-        data = {
-            "time": sensor_data.time,
-            "state": {"x": state.x, "y": state.y, "theta": state.theta},
-            "gps": {"x": sensor_data.gps[0], "y": sensor_data.gps[1]},
-            "errors": {"distance": command.rho, "heading": command.alpha},
-            "current_velocities": {"linear": state.v, "angular": state.omega},
-            "target_velocities": {"linear": command.v, "angular": command.omega},
-            "goal_position": {"x": goal.x, "y": goal.y},
-            "next_point": {"x": next_point.x, "y": next_point.y} if next_point else None
+    def _empty_telemetry():
+        return {
+            "state_x": 0.0,
+            "state_y": 0.0,
+            "state_theta": 0.0,
+            "gps_x": 0.0,
+            "gps_y": 0.0,
+            "error_distance": 0.0,
+            "error_heading": 0.0,
+            "current_vel_linear": 0.0,
+            "current_vel_angular": 0.0,
+            "target_vel_linear": 0.0,
+            "target_vel_angular": 0.0,
+            "next_point_x": None,
+            "next_point_y": None,
         }
 
-        with open(self.realtime_log_file_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(data) + "\n")
-        with open(self.realtime_panel, "w", encoding="utf-8") as f:
-            f.write(json.dumps(data) + "\n")
-    
-    def log_event(self, sim_time, event_type, details):
-        self.events.append((self.sim_id, sim_time, event_type, details))
-        self.event_count += 1
-        try:
-            with open(self.realtime_panel, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            print(f"Warning: Realtime panel unavailable/corrupt at sim_time={sim_time}. Logging event telemetry with default values.")
-            data = {}
+    def _post(self, endpoint, payload):
+        if self._request_fn is not None:
+            try:
+                return self._request_fn(endpoint, payload)
+            except Exception as exc:
+                print(f"[RobotLog {self.unit_id}] Request to {endpoint} failed: {exc}")
+                return None
 
-        x = (
-            self.sim_id,
-            sim_time,
-            event_type,
-            data.get("state", {}).get("x", 0.0),
-            data.get("state", {}).get("y", 0.0),
-            data.get("state", {}).get("theta", 0.0),
-            data.get("gps", {}).get("x", 0.0),
-            data.get("gps", {}).get("y", 0.0),
-            data.get("errors", {}).get("distance", 0.0),
-            data.get("errors", {}).get("heading", 0.0),
-            data.get("current_velocities", {}).get("linear", 0.0),
-            data.get("current_velocities", {}).get("angular", 0.0),
-            data.get("target_velocities", {}).get("linear", 0.0),
-            data.get("target_velocities", {}).get("angular", 0.0),
-            data.get("next_point", {}).get("x") if data.get("next_point") else None,
-            data.get("next_point", {}).get("y") if data.get("next_point") else None,
+        request = urllib.request.Request(
+            f"{self.server_url}{endpoint}",
+            data=json.dumps(payload).encode("utf-8"),
+            method="POST",
+            headers={"Content-Type": "application/json"},
         )
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                body = response.read().decode("utf-8")
+                return json.loads(body) if body else None
+        except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
+            print(f"[RobotLog {self.unit_id}] Request to {endpoint} failed: {exc}")
+            return None
 
-        self.event_telemetry.append(x)
+    @staticmethod
+    def _successful(response):
+        return isinstance(response, dict) and response.get("status") == "success"
+
+    def start(self, sim_time, attempts=10, retry_delay=1.0):
+        if self.sim_id is not None:
+            return True
+
+        for attempt in range(attempts):
+            response = self._post("/start", {"unit_id": self.unit_id})
+            sim_id = response.get("sim_id") if self._successful(response) else None
+            if isinstance(sim_id, int) and not isinstance(sim_id, bool) and sim_id > 0:
+                self.sim_id = sim_id
+                self.start_time = sim_time
+                self.last_time = sim_time
+                self.log_event(sim_time, "START", "Controller started")
+                return True
+            if attempt + 1 < attempts:
+                self._sleep(retry_delay)
+
+        print(
+            f"[RobotLog {self.unit_id}] Logging service unavailable after "
+            f"{attempts} start attempts."
+        )
+        return False
+
+    def capture_telemetry(self, sensor_data, state, goal, command, next_point=None):
+        """Keep the latest controller telemetry in memory for the next event."""
+        self.latest_telemetry = {
+            "state_x": state.x,
+            "state_y": state.y,
+            "state_theta": state.theta,
+            "gps_x": sensor_data.gps[0],
+            "gps_y": sensor_data.gps[1],
+            "error_distance": command.rho,
+            "error_heading": command.alpha,
+            "current_vel_linear": state.v,
+            "current_vel_angular": state.omega,
+            "target_vel_linear": command.v,
+            "target_vel_angular": command.omega,
+            "next_point_x": next_point.x if next_point is not None else None,
+            "next_point_y": next_point.y if next_point is not None else None,
+        }
+
+    def log_event(self, sim_time, event_type, details):
+        if self.sim_id is None:
+            return
+        event = {
+            "sim_id": self.sim_id,
+            "sim_time": sim_time,
+            "e_type": event_type,
+            "details": details,
+        }
+        telemetry = {
+            "sim_id": self.sim_id,
+            "event_time": sim_time,
+            "e_type": event_type,
+            **self.latest_telemetry,
+        }
+        self.events.append(event)
+        self.event_telemetry.append(telemetry)
+        self.event_count += 1
 
     def log_target_reached(self, sim_time, target_index=None, target=None):
         details = "target reached"
@@ -279,186 +147,106 @@ class RobotLog:
         self.log_event(sim_time, "UNEXPECTED_BEHAVIOR", description)
 
     def update_obstacle_state(self, sim_time, has_obstacle, sensor_data):
-        gps_x = sensor_data.gps[0]
-        gps_y = sensor_data.gps[1]
-        obstacle_msg = f"obstacle(s) found at x={gps_x:.2f}; y={gps_y:.2f}" if has_obstacle else f"obstacle cleared at x={gps_x:.2f}; y={gps_y:.2f}"
+        gps_x, gps_y = sensor_data.gps
+        if has_obstacle:
+            details = f"obstacle(s) found at x={gps_x:.2f}; y={gps_y:.2f}"
+        else:
+            details = f"obstacle cleared at x={gps_x:.2f}; y={gps_y:.2f}"
+
         if has_obstacle and not self.in_obstacle_state:
             self.obstacle_count += 1
-            self.log_event(sim_time, "OBSTACLE_ENCOUNTER", obstacle_msg)
+            self.log_event(sim_time, "OBSTACLE_ENCOUNTER", details)
         elif not has_obstacle and self.in_obstacle_state:
-            self.log_event(sim_time, "OBSTACLE_CLEARED", obstacle_msg)
-
+            self.log_event(sim_time, "OBSTACLE_CLEARED", details)
         self.in_obstacle_state = has_obstacle
 
     def update_idle_state(self, current_time, state, idle_speed_threshold=1e-3):
-        if self.start_time is None:   
-            self.start(current_time)
+        if self.start_time is None:
             return
-        
         if self.last_time is None:
             self.last_time = current_time
 
         delta_t = max(0.0, current_time - self.last_time)
         self.total_time = max(0.0, current_time - self.start_time)
-
         currently_idle = abs(state.v) <= idle_speed_threshold
         if currently_idle:
             self.idle_time += delta_t
 
         if currently_idle != self.is_idle:
             if currently_idle:
-                self.log_event(current_time, "IDLE_START", f"linear_speed={state.v:.6f}, angular_speed={state.omega:.2f}")
+                details = f"linear_speed={state.v:.6f}, angular_speed={state.omega:.2f}"
+                self.log_event(current_time, "IDLE_START", details)
             else:
-                self.log_event(current_time, "IDLE_END", f"linear_speed={state.v:.6f}, angular_speed={state.omega:.2f}")
+                details = f"linear_speed={state.v:.6f}, angular_speed={state.omega:.2f}"
+                self.log_event(current_time, "IDLE_END", details)
             self.is_idle = currently_idle
-
         self.last_time = current_time
 
-    # TODO: remove this method after database integration is verified working, as we will be saving directly to the database instead of a JSONL file
-    def save(self):
-        log_dir = os.path.dirname(self.log_file_path)
-        if log_dir:
-            os.makedirs(log_dir, exist_ok=True)
+    def _summary(self):
+        return {
+            "total_sim_time": self.total_time,
+            "obstacle_count": self.obstacle_count,
+            "total_idle_time": self.idle_time,
+            "event_count": self.event_count,
+        }
 
-        for sim_id, sim_time, event_type, details in self.events:
-            events_dict = {
+    def _send_batch(self, events, event_telemetry):
+        if self.sim_id is None:
+            return False
+        response = self._post(
+            "/save",
+            {
                 "unit_id": self.unit_id,
-                "obstacle_count": self.obstacle_count,
-                "event": [
-                    {
-                        "sim_id": sim_id,
-                        "sim_time": sim_time,
-                        "event_type": event_type,
-                        "details": details,
-                    }
-                ],
-            }
-            with open(self.log_file_path, "a", encoding="utf-8") as log_file:
-                log_file.write(json.dumps(events_dict) + "\n")
-        
-        print(f"Saved {len(self.events)} events to {self.log_file_path}")
+                "sim_id": self.sim_id,
+                "summary": self._summary(),
+                "events": events,
+                "event_telemetry": event_telemetry,
+            },
+        )
+        return self._successful(response)
 
-    def save_to_database(self):
-        """
-        Updates the simulation summary and batch-saves in-memory events
-        and event telemetry records to MySQL.
-        Also overwrites the current simulation line in simulations.jsonl
-        so the dashboard always reflects the latest state.
-        """
-        self._update_simulation()
-        self._append_event()
-        self._append_telemetry()
+    def flush(self):
+        """Persist failed records first, preserving event order across retries."""
+        if self.failed_events or self.failed_event_telemetry:
+            if not self._send_batch(self.failed_events, self.failed_event_telemetry):
+                self.failed_events.extend(self.events)
+                self.failed_event_telemetry.extend(self.event_telemetry)
+                self.events.clear()
+                self.event_telemetry.clear()
+                return False
+            self.failed_events.clear()
+            self.failed_event_telemetry.clear()
+            if not self.events and not self.event_telemetry:
+                return True
 
-        conn = None
-        cursor = None
-        v = "simulation summary"
-        try:
-            conn = mysql.connector.connect(
-                host=self.db_host,
-                port=self.db_port,
-                user=self.db_user,
-                password=self.db_password,
-                database=self.db_name
-            )
-            cursor = conn.cursor()
-            
-            update_query_simulations = """
-                UPDATE Simulations 
-                SET total_sim_time = %s, obstacle_count = %s, total_idle_time = %s, event_count = %s
-                WHERE id = %s
-            """
+        current_events = list(self.events)
+        current_telemetry = list(self.event_telemetry)
+        if self._send_batch(current_events, current_telemetry):
+            del self.events[: len(current_events)]
+            del self.event_telemetry[: len(current_telemetry)]
+            return True
 
-            insert_query_events = """
-                INSERT INTO Events (
-                    sim_id, sim_time, e_type, details
-                ) VALUES (%s, %s, %s, %s)
-            """
+        self.failed_events.extend(current_events)
+        self.failed_event_telemetry.extend(current_telemetry)
+        del self.events[: len(current_events)]
+        del self.event_telemetry[: len(current_telemetry)]
+        return False
 
-            db_events = [
-                (sim_id, self._seconds_to_mysql_time(sim_time), event_type, details)
-                for sim_id, sim_time, event_type, details in self.events
-            ]
+    def stop(self, sim_time, attempts=10, retry_delay=1.0):
+        if not self._stopped:
+            self.log_event(sim_time, "STOP", "Controller stopped")
+            self._stopped = True
 
-            insert_query_events_telemetry = """
-                INSERT INTO EventTelemetry (
-                    sim_id, event_time, e_type, 
-                    state_x, state_y, state_theta,
-                    gps_x, gps_y, 
-                    error_distance, error_heading,
-                    current_vel_linear, current_vel_angular,
-                    target_vel_linear, target_vel_angular,
-                    next_point_x, next_point_y
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
+        for attempt in range(attempts):
+            if self.flush():
+                return True
+            if attempt + 1 < attempts:
+                self._sleep(retry_delay)
 
-            db_event_telemetry = [
-                (
-                    sim_id, self._seconds_to_mysql_time(event_time), event_type,
-                    state_x, state_y, state_theta,
-                    gps_x, gps_y,
-                    error_distance, error_heading,
-                    current_vel_linear, current_vel_angular,
-                    target_vel_linear, target_vel_angular,
-                    next_point_x, next_point_y
-                )
-                for (
-                    sim_id, event_time, event_type,
-                    state_x, state_y, state_theta,
-                    gps_x, gps_y,
-                    error_distance, error_heading,
-                    current_vel_linear, current_vel_angular,
-                    target_vel_linear, target_vel_angular,
-                    next_point_x, next_point_y
-                )
-                in self.event_telemetry
-            ]
-
-            cursor.execute(update_query_simulations, (
-                self._seconds_to_mysql_time(self.total_time),
-                self.obstacle_count,
-                self._seconds_to_mysql_time(self.idle_time),
-                self.event_count,
-                self.sim_id
-            ))
-            
-            conn.commit()
-            print("Successfully saved simulation summary to the database.")
-
-            v = "events"
-
-            # Batch insert using executemany for high performance
-            cursor.executemany(insert_query_events, db_events)
-            conn.commit()
-            print(f"Successfully saved {len(self.events)} event records to the database.")
-            self.events = []
-            print("Cleared events after saving to database.")
-
-            v="event telemetry"
-
-            # Batch insert using executemany for high performance
-            cursor.executemany(insert_query_events_telemetry, db_event_telemetry)
-            conn.commit()
-            print(f"Successfully saved {len(self.event_telemetry)} event telemetry records to the database.")
-            self.event_telemetry = []
-            print("Cleared event telemetry after saving to database.")
-
-            v = ""
-
-        except Exception as e:
-            print(f"Failed to save {v} to database: {e}")
-
-        finally:
-            if cursor is not None:
-                try: cursor.close()
-                except Exception: pass
-            if conn is not None and conn.is_connected():
-                try: conn.close()
-                except Exception: pass
-            if v == "events" or v == "simulation summary":
-                self.events = []
-                print("Cleared events after saving to jsonl file.")
-                self.event_telemetry = []
-                print("Cleared event telemetry after saving to jsonl file.")
-            if v == "event telemetry":
-                self.event_telemetry = []
-                print("Cleared event telemetry after saving to jsonl file.")
+        unsaved_events = len(self.failed_events) + len(self.events)
+        unsaved_telemetry = len(self.failed_event_telemetry) + len(self.event_telemetry)
+        print(
+            f"[RobotLog {self.unit_id}] Shutdown left {unsaved_events} events and "
+            f"{unsaved_telemetry} telemetry records unsaved."
+        )
+        return False
