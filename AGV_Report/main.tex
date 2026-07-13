@@ -1,0 +1,50 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue]{hyperref}
+\usepackage[nameinlink,noabbrev]{cleveref}
+
+\graphicspath{{images/}}
+\setlist{itemsep=0.4ex, topsep=0.6ex}
+
+\lstdefinestyle{code}{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  showstringspaces=false
+}
+
+\title{Autonomous Guided Vehicle Project}
+\author{PMDS x DevNut Team}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This report documents the design and development of an Autonomous Guided Vehicle (AGV) system in a simulated warehouse environment. It describes the current controller, earlier controller iterations, the logging infrastructure and the web application used to inspect simulation results. Replace this text with a concise summary of the final system, its main design choices and the outcomes of the evaluation.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\input{controllers}
+\input{old_controller}
+\input{logger}
+\input{webapp}
+
+\end{document}
