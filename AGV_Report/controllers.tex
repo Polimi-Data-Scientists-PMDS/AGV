@@ -1,0 +1,16 @@
+\section{Current Controller}
+\label{sec:controllers}
+
+This section describes the current AGV controller implemented for the Webots warehouse simulation. The controller integrates perception, localization, planning and low-level motion control to move each vehicle through the environment while accounting for configured goals and dynamic obstacles.
+
+\subsection{Architecture}
+
+Describe the controller as a sequence of cooperating components. Start from the information received from Webots and explain how sensor data is transformed into a state estimate, a route and finally motor commands. Refer to implementation details only when they clarify an engineering choice or a relevant limitation.
+
+\subsection{Planning and Control}
+
+Explain the high-level and low-level planning responsibilities, including how the controller selects waypoints, reacts to blocked paths and completes a goal. Use equations only when they make an algorithm or a measurable quantity clearer; otherwise, prefer a precise prose explanation.
+
+\subsection{Observed Behaviour}
+
+Summarize the behaviour observed during representative simulations. State what worked reliably, identify situations that required special handling and connect each limitation to its likely technical cause.
