@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   asNumber,
-  emptySimulationTableData,
   eventColumns,
-  fetchSimulationTableData,
   formatTableValue,
   isNumericValue,
   simulationColumns,
@@ -24,21 +22,19 @@ type DataTableProps = {
 
 type SimulationTablesProps = {
   data: SimulationTableData;
+  selectedSimulationId: number | null;
   defaultOpen?: boolean;
   compact?: boolean;
 };
 
+type SimulationTablePageProps = {
+  data: SimulationTableData;
+  loading: boolean;
+  error: string;
+  selectedSimulationId: number | null;
+};
+
 const allEventTypes = "__ALL_EVENT_TYPES__";
-const allSimulationIds = "__ALL_SIMULATION_IDS__";
-
-function simulationIdOf(row: TableRow) {
-  const rawId = row.id ?? row.sim_id;
-  if (rawId === null || rawId === undefined) {
-    return "";
-  }
-
-  return String(rawId).trim();
-}
 
 function eventTypeOf(row: TableRow) {
   const rawType = row.e_type ?? row.event_type;
@@ -73,60 +69,6 @@ function buildEventTypeOptions(data: SimulationTableData) {
       type,
       count: eventCounts.get(type) ?? telemetryCounts.get(type) ?? 0,
     }));
-}
-
-function buildSimulationOptions(data: SimulationTableData) {
-  const counts = new Map<string, { events: number; telemetry: number; simulations: number }>();
-
-  function ensure(id: string) {
-    const current = counts.get(id) ?? { events: 0, telemetry: 0, simulations: 0 };
-    counts.set(id, current);
-    return current;
-  }
-
-  data.simulations.forEach((row) => {
-    const id = simulationIdOf(row);
-    if (id) {
-      ensure(id).simulations += 1;
-    }
-  });
-
-  data.events.forEach((row) => {
-    const id = simulationIdOf(row);
-    if (id) {
-      ensure(id).events += 1;
-    }
-  });
-
-  data.telemetry.forEach((row) => {
-    const id = simulationIdOf(row);
-    if (id) {
-      ensure(id).telemetry += 1;
-    }
-  });
-
-  return Array.from(counts.entries())
-    .sort(([a], [b]) => {
-      const numericA = Number(a);
-      const numericB = Number(b);
-      if (Number.isFinite(numericA) && Number.isFinite(numericB)) {
-        return numericB - numericA;
-      }
-
-      return a.localeCompare(b);
-    })
-    .map(([id, count]) => ({
-      id,
-      count: count.events || count.telemetry || count.simulations,
-    }));
-}
-
-function filterRowsBySimulationId(rows: TableRow[], selectedSimulationId: string) {
-  if (selectedSimulationId === allSimulationIds) {
-    return rows;
-  }
-
-  return rows.filter((row) => simulationIdOf(row) === selectedSimulationId);
 }
 
 function filterRowsByEventType(rows: TableRow[], selectedEventType: string) {
@@ -177,28 +119,28 @@ export function DataTable({ title, emptyMessage, columns, rows, defaultOpen = fa
   );
 }
 
-export function SimulationTables({ data, defaultOpen = false, compact = false }: SimulationTablesProps) {
-  const [selectedSimulationId, setSelectedSimulationId] = useState(allSimulationIds);
+export function SimulationTables({
+  data,
+  defaultOpen = false,
+  compact = false,
+  selectedSimulationId,
+}: SimulationTablesProps) {
   const [selectedEventType, setSelectedEventType] = useState(allEventTypes);
-  const simulationOptions = useMemo(() => buildSimulationOptions(data), [data]);
-  const simulationFilteredData = useMemo(
-    () => ({
-      simulations: filterRowsBySimulationId(data.simulations, selectedSimulationId),
-      events: filterRowsBySimulationId(data.events, selectedSimulationId),
-      telemetry: filterRowsBySimulationId(data.telemetry, selectedSimulationId),
-    }),
-    [data, selectedSimulationId],
-  );
-  const eventTypeOptions = useMemo(() => buildEventTypeOptions(simulationFilteredData), [simulationFilteredData]);
+  const eventTypeOptions = useMemo(() => buildEventTypeOptions(data), [data]);
   const filteredData = useMemo(
     () => ({
-      simulations: simulationFilteredData.simulations,
-      events: filterRowsByEventType(simulationFilteredData.events, selectedEventType),
-      telemetry: filterRowsByEventType(simulationFilteredData.telemetry, selectedEventType),
+      simulations: data.simulations,
+      events: filterRowsByEventType(data.events, selectedEventType),
+      telemetry: filterRowsByEventType(data.telemetry, selectedEventType),
     }),
-    [simulationFilteredData, selectedEventType],
+    [data, selectedEventType],
   );
-  const totalEventRows = simulationFilteredData.events.length;
+  const totalEventRows = data.events.length;
+  const hasNoMatchingUnitSimulation =
+    selectedSimulationId !== null &&
+    data.simulations.length === 0 &&
+    data.events.length === 0 &&
+    data.telemetry.length === 0;
 
   useEffect(() => {
     if (selectedEventType !== allEventTypes && !eventTypeOptions.some((option) => option.type === selectedEventType)) {
@@ -206,44 +148,12 @@ export function SimulationTables({ data, defaultOpen = false, compact = false }:
     }
   }, [eventTypeOptions, selectedEventType]);
 
-  useEffect(() => {
-    if (selectedSimulationId !== allSimulationIds && !simulationOptions.some((option) => option.id === selectedSimulationId)) {
-      setSelectedSimulationId(allSimulationIds);
-    }
-  }, [selectedSimulationId, simulationOptions]);
-
   return (
     <div className="simulation-tables">
-      {simulationOptions.length > 0 && (
-        <div className={`event-filter-bar ${compact ? "event-filter-bar-compact" : ""}`} aria-label="Filter log rows by simulation">
-          <div className="event-filter-copy">
-            <span>Simulation Filter</span>
-            <small>{selectedSimulationId === allSimulationIds ? "Showing all simulations" : `Showing simulation ${selectedSimulationId}`}</small>
-          </div>
-          <div className="event-filter-actions">
-            <button
-              type="button"
-              className={selectedSimulationId === allSimulationIds ? "active" : undefined}
-              aria-pressed={selectedSimulationId === allSimulationIds}
-              onClick={() => setSelectedSimulationId(allSimulationIds)}
-            >
-              All
-              <span>{simulationOptions.length}</span>
-            </button>
-            {simulationOptions.map(({ id, count }) => (
-              <button
-                type="button"
-                key={id}
-                className={selectedSimulationId === id ? "active" : undefined}
-                aria-pressed={selectedSimulationId === id}
-                onClick={() => setSelectedSimulationId(id)}
-              >
-                Sim {id}
-                <span>{count}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+      {hasNoMatchingUnitSimulation && (
+        <p className="simulation-selection-empty">
+          No records match this unit and simulation combination. The unit and simulation may exist individually but may not belong together.
+        </p>
       )}
       {eventTypeOptions.length > 0 && (
         <div className={`event-filter-bar ${compact ? "event-filter-bar-compact" : ""}`} aria-label="Filter log events by type">
@@ -315,29 +225,12 @@ export function latestNumericValue(rows: TableRow[], key: string) {
   return null;
 }
 
-export default function SimulationTable() {
-  const [data, setData] = useState<SimulationTableData>(emptySimulationTableData);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setData(await fetchSimulationTableData());
-        setError("");
-      } catch (err) {
-        console.error("Error loading simulation tables:", err);
-        setError("Could not load simulation data.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-    const intervalId = window.setInterval(loadData, 500);
-    return () => window.clearInterval(intervalId);
-  }, []);
-
+export default function SimulationTable({
+  data,
+  loading,
+  error,
+  selectedSimulationId,
+}: SimulationTablePageProps) {
   if (loading) {
     return <p className="panel-message">Loading simulation data...</p>;
   }
@@ -346,5 +239,10 @@ export default function SimulationTable() {
     return <p className="panel-message panel-message-error">{error}</p>;
   }
 
-  return <SimulationTables data={data} />;
+  return (
+    <SimulationTables
+      data={data}
+      selectedSimulationId={selectedSimulationId}
+    />
+  );
 }

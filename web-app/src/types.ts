@@ -1,4 +1,6 @@
 export type RobotData = {
+  unit_id: string;
+  sim_id: number;
   time: number;
   state: { x: number; y: number; theta: number };
   gps: { x: number; y: number };

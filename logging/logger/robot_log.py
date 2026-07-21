@@ -1,20 +1,35 @@
 import json
+import os
+import tempfile
 import time
 import urllib.error
 import urllib.request
 
 
 DEFAULT_SERVER_URL = "http://127.0.0.1:8080"
+DEFAULT_LOGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "logs"))
+REALTIME_WRITE_INTERVAL = 0.05
 
 
 class RobotLog:
     """Controller-side event collector and HTTP persistence client."""
 
-    def __init__(self, server_url=DEFAULT_SERVER_URL, unit_id="unknown", request_fn=None, sleep_fn=None):
+    def __init__(
+        self,
+        server_url=DEFAULT_SERVER_URL,
+        unit_id="unknown",
+        request_fn=None,
+        sleep_fn=None,
+        logs_dir=DEFAULT_LOGS_DIR,
+        realtime_write_interval=REALTIME_WRITE_INTERVAL,
+    ):
         self.server_url = server_url.rstrip("/")
         self.unit_id = str(unit_id)
         self._request_fn = request_fn
         self._sleep = sleep_fn or time.sleep
+        self.logs_dir = os.fspath(logs_dir)
+        self.realtime_write_interval = realtime_write_interval
+        self._last_realtime_write_time = None
 
         self.sim_id = None
         self.start_time = None
@@ -31,6 +46,123 @@ class RobotLog:
         self.is_idle = False
         self.in_obstacle_state = False
         self._stopped = False
+
+    def _normalized_realtime_unit_id(self):
+        if not self.unit_id.isdigit():
+            return None
+        return str(int(self.unit_id))
+
+    def _realtime_file_path(self):
+        unit_id = self._normalized_realtime_unit_id()
+        if unit_id is None:
+            return None
+        return os.path.join(
+            self.logs_dir,
+            f"robot_controller_runs_{unit_id}_realtime.jsonl",
+        )
+
+    def _replace_realtime_contents(self, contents):
+        realtime_path = self._realtime_file_path()
+        if realtime_path is None:
+            print(
+                f"[RobotLog {self.unit_id}] Realtime write skipped: "
+                "unit_id must be numeric."
+            )
+            return False
+
+        temporary_path = None
+        try:
+            os.makedirs(self.logs_dir, exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=self.logs_dir,
+                prefix=f".{os.path.basename(realtime_path)}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temporary_file:
+                temporary_path = temporary_file.name
+                temporary_file.write(contents)
+            os.replace(temporary_path, realtime_path)
+            temporary_path = None
+            return True
+        except OSError as exc:
+            print(f"[RobotLog {self.unit_id}] Realtime file update failed: {exc}")
+            return False
+        finally:
+            if temporary_path is not None:
+                try:
+                    os.unlink(temporary_path)
+                except OSError:
+                    pass
+
+    def _realtime_payload(self, sim_time, sensor_data, state, goal, command, next_point):
+        return {
+            "unit_id": self._normalized_realtime_unit_id(),
+            "sim_id": self.sim_id,
+            "time": sim_time,
+            "state": {"x": state.x, "y": state.y, "theta": state.theta},
+            "gps": {"x": sensor_data.gps[0], "y": sensor_data.gps[1]},
+            "errors": {"distance": command.rho, "heading": command.alpha},
+            "current_velocities": {"linear": state.v, "angular": state.omega},
+            "target_velocities": {"linear": command.v, "angular": command.omega},
+            "goal_position": {"x": goal.x, "y": goal.y},
+            "next_point": (
+                {"x": next_point.x, "y": next_point.y}
+                if next_point is not None
+                else None
+            ),
+        }
+
+    def _write_realtime_snapshot(
+        self,
+        sim_time,
+        sensor_data,
+        state,
+        goal,
+        command,
+        next_point=None,
+    ):
+        if self.sim_id is None:
+            return False
+
+        if (
+            self._last_realtime_write_time is not None
+            and sim_time >= self._last_realtime_write_time
+            and sim_time - self._last_realtime_write_time < self.realtime_write_interval
+        ):
+            return False
+
+        try:
+            payload = self._realtime_payload(
+                sim_time,
+                sensor_data,
+                state,
+                goal,
+                command,
+                next_point,
+            )
+            contents = json.dumps(
+                payload,
+                allow_nan=False,
+                separators=(",", ":"),
+            ) + "\n"
+        except (AttributeError, IndexError, TypeError, ValueError) as exc:
+            print(f"[RobotLog {self.unit_id}] Realtime serialization failed: {exc}")
+            return False
+
+        if not self._replace_realtime_contents(contents):
+            return False
+
+        self._last_realtime_write_time = sim_time
+        return True
+
+    def clear_realtime(self):
+        """Best-effort truncation of this unit's live telemetry snapshot."""
+        cleared = self._replace_realtime_contents("")
+        if cleared:
+            self._last_realtime_write_time = None
+        return cleared
 
     @staticmethod
     def _empty_telemetry():
@@ -98,7 +230,15 @@ class RobotLog:
         )
         return False
 
-    def capture_telemetry(self, sensor_data, state, goal, command, next_point=None):
+    def capture_telemetry(
+        self,
+        sim_time,
+        sensor_data,
+        state,
+        goal,
+        command,
+        next_point=None,
+    ):
         """Keep the latest controller telemetry in memory for the next event."""
         self.latest_telemetry = {
             "state_x": state.x,
@@ -115,6 +255,14 @@ class RobotLog:
             "next_point_x": next_point.x if next_point is not None else None,
             "next_point_y": next_point.y if next_point is not None else None,
         }
+        self._write_realtime_snapshot(
+            sim_time,
+            sensor_data,
+            state,
+            goal,
+            command,
+            next_point,
+        )
 
     def log_event(self, sim_time, event_type, details):
         if self.sim_id is None:

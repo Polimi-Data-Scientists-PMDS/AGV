@@ -7,14 +7,17 @@ import os
 import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
 
 import mysql.connector
 
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8080
+DEFAULT_READ_LIMIT = 200
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DEFAULT_LOGS_DIR = os.path.join(PROJECT_ROOT, "logging", "logs")
+READ_FILTER_NAMES = frozenset({"unit_id", "sim_id"})
 ALLOWED_EVENT_TYPES = frozenset(
     {
         "START",
@@ -68,6 +71,42 @@ def validate_start_payload(payload):
     if not isinstance(payload, dict):
         raise PayloadValidationError("request body must be an object")
     return _require_numeric_unit_id(payload.get("unit_id"))
+
+
+def validate_read_query(query):
+    if not isinstance(query, dict):
+        raise PayloadValidationError("query parameters must be a mapping")
+
+    unknown_names = sorted(set(query) - READ_FILTER_NAMES)
+    if unknown_names:
+        joined_names = ", ".join(unknown_names)
+        raise PayloadValidationError(f"unknown query parameter(s): {joined_names}")
+
+    normalized = {"unit_id": None, "sim_id": None}
+    for name in READ_FILTER_NAMES:
+        values = query.get(name)
+        if values is None:
+            continue
+        if not isinstance(values, list) or len(values) != 1:
+            raise PayloadValidationError(f"{name} must appear exactly once")
+
+        value = values[0]
+        if name == "unit_id":
+            normalized[name] = _require_numeric_unit_id(value)
+        elif not isinstance(value, str) or not value.isdigit() or int(value) <= 0:
+            raise PayloadValidationError("sim_id must be a positive integer")
+        else:
+            normalized[name] = int(value)
+
+    return normalized
+
+
+def validate_empty_query(query):
+    if not isinstance(query, dict):
+        raise PayloadValidationError("query parameters must be a mapping")
+    if query:
+        names = ", ".join(sorted(query))
+        raise PayloadValidationError(f"query parameter(s) are not allowed: {names}")
 
 
 def _event_identity(record, time_field):
@@ -197,6 +236,205 @@ class PersistenceService:
                 self.connection = None
         self.connection = self.connection_factory()
         return self.connection
+
+    @staticmethod
+    def _fetch_rows(connection, query, parameters):
+        cursor = connection.cursor()
+        try:
+            cursor.execute(query, tuple(parameters))
+            columns = [description[0] for description in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        finally:
+            cursor.close()
+
+    def _read_simulations_from_connection(
+        self, connection, unit_id=None, sim_id=None, limit=DEFAULT_READ_LIMIT
+    ):
+        clauses = []
+        parameters = []
+        if unit_id is not None:
+            clauses.append("unit_id = %s")
+            parameters.append(unit_id)
+        if sim_id is not None:
+            clauses.append("id = %s")
+            parameters.append(sim_id)
+
+        where_clause = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        limit_clause = " LIMIT %s" if limit is not None else ""
+        if limit is not None:
+            parameters.append(limit)
+        query = f"""
+            SELECT id, unit_id, total_sim_time, obstacle_count, total_idle_time, event_count
+            FROM Simulations{where_clause}
+            ORDER BY id DESC{limit_clause}
+        """
+        rows = self._fetch_rows(connection, query, parameters)
+        rows.reverse()
+        return rows
+
+    def read_simulations(self, unit_id=None, sim_id=None, limit=DEFAULT_READ_LIMIT):
+        with self.lock:
+            connection = None
+            try:
+                connection = self._get_connection()
+                return self._read_simulations_from_connection(
+                    connection, unit_id, sim_id, limit
+                )
+            except Exception as exc:
+                raise PersistenceError(f"failed to read simulations: {exc}") from exc
+            finally:
+                if connection is not None:
+                    self._rollback(connection)
+
+    def _read_simulation_options_from_connection(self, connection):
+        rows = self._fetch_rows(
+            connection,
+            """
+            SELECT id, unit_id
+            FROM Simulations
+            ORDER BY id DESC
+            """,
+            (),
+        )
+        options_by_unit = {}
+        for row in rows:
+            unit_id = _require_numeric_unit_id(row["unit_id"])
+            sim_id = row["id"]
+            if not _is_int(sim_id) or sim_id <= 0:
+                raise PersistenceError("simulation option id must be a positive integer")
+            options_by_unit.setdefault(unit_id, []).append(sim_id)
+
+        return [
+            {"unit_id": unit_id, "sim_ids": sim_ids}
+            for unit_id, sim_ids in sorted(
+                options_by_unit.items(), key=lambda option: int(option[0])
+            )
+        ]
+
+    def read_simulation_options(self):
+        with self.lock:
+            connection = None
+            try:
+                connection = self._get_connection()
+                return self._read_simulation_options_from_connection(connection)
+            except Exception as exc:
+                raise PersistenceError(
+                    f"failed to read simulation options: {exc}"
+                ) from exc
+            finally:
+                if connection is not None:
+                    self._rollback(connection)
+
+    def _read_events_from_connection(
+        self, connection, unit_id=None, sim_id=None, limit=DEFAULT_READ_LIMIT
+    ):
+        clauses = []
+        parameters = []
+        if unit_id is not None:
+            clauses.append("s.unit_id = %s")
+            parameters.append(unit_id)
+        if sim_id is not None:
+            clauses.append("e.sim_id = %s")
+            parameters.append(sim_id)
+
+        where_clause = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        limit_clause = " LIMIT %s" if limit is not None else ""
+        if limit is not None:
+            parameters.append(limit)
+        query = f"""
+            SELECT s.unit_id, e.sim_id, e.sim_time, e.e_type, e.details
+            FROM Events AS e
+            JOIN Simulations AS s ON s.id = e.sim_id{where_clause}
+            ORDER BY e.sim_id DESC, e.sim_time DESC, e.e_type DESC{limit_clause}
+        """
+        rows = self._fetch_rows(connection, query, parameters)
+        rows.reverse()
+        return rows
+
+    def read_events(self, unit_id=None, sim_id=None, limit=DEFAULT_READ_LIMIT):
+        with self.lock:
+            connection = None
+            try:
+                connection = self._get_connection()
+                return self._read_events_from_connection(
+                    connection, unit_id, sim_id, limit
+                )
+            except Exception as exc:
+                raise PersistenceError(f"failed to read events: {exc}") from exc
+            finally:
+                if connection is not None:
+                    self._rollback(connection)
+
+    def _read_event_telemetry_from_connection(
+        self, connection, unit_id=None, sim_id=None, limit=DEFAULT_READ_LIMIT
+    ):
+        clauses = []
+        parameters = []
+        if unit_id is not None:
+            clauses.append("s.unit_id = %s")
+            parameters.append(unit_id)
+        if sim_id is not None:
+            clauses.append("t.sim_id = %s")
+            parameters.append(sim_id)
+
+        where_clause = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        limit_clause = " LIMIT %s" if limit is not None else ""
+        if limit is not None:
+            parameters.append(limit)
+        query = f"""
+            SELECT s.unit_id, t.sim_id, t.event_time, t.e_type,
+                   t.state_x, t.state_y, t.state_theta, t.gps_x, t.gps_y,
+                   t.error_distance, t.error_heading,
+                   t.current_vel_linear, t.current_vel_angular,
+                   t.target_vel_linear, t.target_vel_angular,
+                   t.next_point_x, t.next_point_y
+            FROM EventTelemetry AS t
+            JOIN Simulations AS s ON s.id = t.sim_id{where_clause}
+            ORDER BY t.sim_id DESC, t.event_time DESC, t.e_type DESC{limit_clause}
+        """
+        rows = self._fetch_rows(connection, query, parameters)
+        rows.reverse()
+        return rows
+
+    def read_event_telemetry(self, unit_id=None, sim_id=None, limit=DEFAULT_READ_LIMIT):
+        with self.lock:
+            connection = None
+            try:
+                connection = self._get_connection()
+                return self._read_event_telemetry_from_connection(
+                    connection, unit_id, sim_id, limit
+                )
+            except Exception as exc:
+                raise PersistenceError(f"failed to read event telemetry: {exc}") from exc
+            finally:
+                if connection is not None:
+                    self._rollback(connection)
+
+    def read_database_snapshot(self, unit_id=None, sim_id=None):
+        with self.lock:
+            connection = None
+            try:
+                connection = self._get_connection()
+                connection.start_transaction(consistent_snapshot=True, readonly=True)
+                simulations = self._read_simulations_from_connection(
+                    connection, unit_id, sim_id, DEFAULT_READ_LIMIT
+                )
+                events = self._read_events_from_connection(
+                    connection, unit_id, sim_id, DEFAULT_READ_LIMIT
+                )
+                telemetry = self._read_event_telemetry_from_connection(
+                    connection, unit_id, sim_id, DEFAULT_READ_LIMIT
+                )
+                return {
+                    "simulations": simulations,
+                    "events": events,
+                    "telemetry": telemetry,
+                }
+            except Exception as exc:
+                raise PersistenceError(f"failed to read database snapshot: {exc}") from exc
+            finally:
+                if connection is not None:
+                    self._rollback(connection)
 
     def start_simulation(self, unit_id):
         with self.lock:
@@ -405,10 +643,46 @@ class LoggingRequestHandler(BaseHTTPRequestHandler):
     service = None
 
     def do_GET(self):
-        if self.path != "/health":
-            self._send_json(404, {"status": "error", "message": "not found"})
-            return
-        self._send_json(200, {"status": "success"})
+        parsed_url = urlsplit(self.path)
+        try:
+            if parsed_url.path == "/health" and not parsed_url.query:
+                self._send_json(200, {"status": "success"})
+            elif parsed_url.path == "/simulation-options":
+                validate_empty_query(parse_qs(parsed_url.query, keep_blank_values=True))
+                options = self.service.read_simulation_options()
+                self._send_json(200, {"units": options}, no_store=True)
+            elif parsed_url.path == "/simulations":
+                filters = validate_read_query(
+                    parse_qs(parsed_url.query, keep_blank_values=True)
+                )
+                rows = self.service.read_simulations(**filters)
+                self._send_json(200, rows, no_store=True)
+            elif parsed_url.path == "/events":
+                filters = validate_read_query(
+                    parse_qs(parsed_url.query, keep_blank_values=True)
+                )
+                rows = self.service.read_events(**filters)
+                self._send_json(200, rows, no_store=True)
+            elif parsed_url.path == "/event-telemetry":
+                filters = validate_read_query(
+                    parse_qs(parsed_url.query, keep_blank_values=True)
+                )
+                rows = self.service.read_event_telemetry(**filters)
+                self._send_json(200, rows, no_store=True)
+            elif parsed_url.path == "/database-snapshot":
+                filters = validate_read_query(
+                    parse_qs(parsed_url.query, keep_blank_values=True)
+                )
+                snapshot = self.service.read_database_snapshot(**filters)
+                self._send_json(200, snapshot, no_store=True)
+            else:
+                self._send_json(404, {"status": "error", "message": "not found"})
+        except PayloadValidationError as exc:
+            self._send_json(400, {"status": "error", "message": str(exc)})
+        except PersistenceError as exc:
+            self._send_json(500, {"status": "error", "message": str(exc)})
+        except Exception as exc:
+            self._send_json(500, {"status": "error", "message": f"unexpected error: {exc}"})
 
     def do_POST(self):
         try:
@@ -445,10 +719,12 @@ class LoggingRequestHandler(BaseHTTPRequestHandler):
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise PayloadValidationError("request body is not valid JSON") from exc
 
-    def _send_json(self, status_code, payload):
-        body = json.dumps(payload).encode("utf-8")
+    def _send_json(self, status_code, payload, no_store=False):
+        body = json.dumps(payload, default=PersistenceService._json_default).encode("utf-8")
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json")
+        if no_store:
+            self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)

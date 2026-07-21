@@ -1,6 +1,7 @@
+import os
 import sys
 
-from config import LogConfig, LOGGER_DIR, PlanningConfig, WorldConfig
+from config import LOGS_DIR, LogConfig, LOGGER_DIR, PlanningConfig, WorldConfig
 from task import GoalConfigurationError, Task
 
 if LOGGER_DIR not in sys.path:
@@ -107,11 +108,27 @@ class AGVSimulation:
                 command = self.safety_limiter.limit(
                     command, self.ll_planning.safety_status, current_time
                 )
+                if self.__emergency_stop_is_active():
+                    command = ControlCommand(
+                        command.rho,
+                        command.alpha,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                    )
 
                 self.hardware.motors.apply_command(command)
 
                 next_point = ll_path.waypoints[0] if ll_path.waypoints else None
-                self.logger.capture_telemetry(sensor_data, state, goal, command, next_point)
+                self.logger.capture_telemetry(
+                    current_time,
+                    sensor_data,
+                    state,
+                    goal,
+                    command,
+                    next_point,
+                )
                 self.logger.update_obstacle_state(
                     current_time,
                     self.ll_planning.safety_status.has_moving_obstacle,
@@ -126,7 +143,10 @@ class AGVSimulation:
         finally:
             print(f"Unit {self.unit_id}: controller stopped, flushing logging data...")
             self.hardware.motors.stop()
-            self.logger.stop(self.hardware.get_time())
+            try:
+                self.logger.stop(self.hardware.get_time())
+            finally:
+                self.logger.clear_realtime()
 
     def __get_updated_goal(self, current_time, state):
         goal = Position(*self.task.get_goal(self.goal_index))
@@ -145,6 +165,10 @@ class AGVSimulation:
 
     def __should_flush(self, current_time):
         return current_time - self.last_db_save >= self.log_config.log_interval
+
+    @staticmethod
+    def __emergency_stop_is_active():
+        return os.path.isfile(os.path.join(LOGS_DIR, "emergency_stop.flag"))
 
 
 if __name__ == "__main__":

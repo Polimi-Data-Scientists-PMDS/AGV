@@ -1,24 +1,78 @@
 {
   "Goals": [
-    {"name": "CHARGING_STATION", "coordinates": [6.75, -4.5]},
-    {"name": "DROPOFF_01", "coordinates": [-29.3, 4]},
-    {"name": "PICKUP_01", "coordinates": [-24, 3.5]},
-    {"name": "PICKUP_02", "coordinates": [-18.5, 6.25]},
-    {"name": "PICKUP_03", "coordinates": [-13.5, 6.25]},
-    {"name": "PICKUP_04", "coordinates": [-8.25, 4.5]},
-    {"name": "PICKUP_05", "coordinates": [-2, 5.75]},
-    {"name": "PICKUP_06", "coordinates": [3.75, 5.75]},
-    {"name": "PICKUP_07", "coordinates": [18.75, 2.25]}
+    {
+      "name": "CHARGING_STATION",
+      "coordinates": [
+        6.75,
+        -4.5
+      ]
+    },
+    {
+      "name": "DROPOFF_01",
+      "coordinates": [
+        -29.3,
+        4
+      ]
+    },
+    {
+      "name": "PICKUP_01",
+      "coordinates": [
+        -24,
+        3.5
+      ]
+    },
+    {
+      "name": "PICKUP_02",
+      "coordinates": [
+        -18.5,
+        6.25
+      ]
+    },
+    {
+      "name": "PICKUP_03",
+      "coordinates": [
+        -13.5,
+        6.25
+      ]
+    },
+    {
+      "name": "PICKUP_04",
+      "coordinates": [
+        -8.25,
+        4.5
+      ]
+    },
+    {
+      "name": "PICKUP_05",
+      "coordinates": [
+        -2,
+        5.75
+      ]
+    },
+    {
+      "name": "PICKUP_06",
+      "coordinates": [
+        3.75,
+        5.75
+      ]
+    },
+    {
+      "name": "PICKUP_07",
+      "coordinates": [
+        18.75,
+        2.25
+      ]
+    }
   ],
   "RobotRoutes": {
     "1": [
-      "CHARGING_STATION",
       "DROPOFF_01",
       "PICKUP_01",
       "PICKUP_02",
       "PICKUP_03",
       "PICKUP_04",
       "PICKUP_05",
+      "CHARGING_STATION",
       "PICKUP_06",
       "PICKUP_07"
     ],
