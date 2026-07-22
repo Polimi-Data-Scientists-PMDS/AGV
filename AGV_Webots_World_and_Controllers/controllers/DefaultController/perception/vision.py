@@ -80,7 +80,7 @@ class ObjectDetector:
         annotated_frame = results[0].plot()
 
         # 3. Save the live video feed to disk
-        # Save the frame to disk so the Streamlit dashboard can access it
+        # Save the frame to disk so the React/Vite web app can access it.
         os.makedirs(LOGS_DIR, exist_ok=True)
         cv2.imwrite(
             os.path.join(LOGS_DIR, f"camera_feed_{self.unit_id}.jpg"),

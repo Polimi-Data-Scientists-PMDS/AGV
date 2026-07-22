@@ -3,10 +3,11 @@
 This guide explains how to contribute code to the React/Vite web app in `web-app`.
 It assumes you have never worked on this app before.
 
-The web app is the browser dashboard for the AGV project. It does not control the
-robot directly. It reads files produced by the controller, exposes them through
-small Vite API routes, and renders them as dashboard pages, maps, tables, image
-feeds, and goal-order controls.
+The web app is the browser dashboard for the AGV project. The React frontend
+uses local Vite middleware to read controller-produced realtime files, proxy
+persistent queries to the logging service, update the controller-owned goal
+configuration, and publish the shared motion-inhibit signal. It renders these
+capabilities as dashboard pages, maps, tables, image feeds, and route controls.
 
 ## Brief summary
 
@@ -18,31 +19,33 @@ feeds, and goal-order controls.
 5. Start from `web-app/src/App.css` for visual layout, spacing, grid behavior,
    card sizing, responsive behavior, and the dark command-center theme.
 6. Start from `web-app/vite.config.ts` for local API routes such as
-   `/api/realtime-panel`, `/api/camera-feed`, `/api/local-planner-grid`,
-   `/api/goals`, `/api/simulations`, `/api/events`, and
-   `/api/event-telemetry`.
+   `/api/realtime-units`, `/api/realtime`, `/api/database-snapshot`,
+   `/api/simulation-options`, `/api/camera-feed`,
+   `/api/local-planner-grid`, `/api/goals`, and `/api/emergency-stop`.
 7. Start from `web-app/src/data.ts` and `web-app/src/SimulationTable.tsx` for
    simulation, event, and event-telemetry table behavior.
 8. Start from `web-app/src/LiveMap.tsx`, `web-app/src/mapData.ts`, and
    `web-app/src/types.ts` for map rendering and realtime robot data shape.
-9. Start from `web-app/src/goals.ts` and `web-app/src/goals.config.json` for
-   dashboard goal-order loading, movement, and persistence.
+9. Start from `web-app/src/goals.ts` and the controller-owned
+   `AGV_Webots_World_and_Controllers/controllers/DefaultController/goals.config.json`
+   for dashboard route loading, creation, movement, removal, and persistence.
 10. Do not edit `web-app/node_modules` or `web-app/dist` by hand.
-11. Do not use `web-app/app.py` for the active React app. It is the old
-    Streamlit dashboard, not the current React/Vite surface.
 
 ## Mental model
 
 The web app has three layers:
 
-1. Controller output files:
-   The Webots controller writes runtime files under `logging/logs`, including
-   realtime telemetry, camera images, planner images, simulations, events, and
-   event telemetry.
+1. Runtime producers and services:
+   Each Webots controller writes a unit-specific realtime JSONL snapshot and
+   unit-specific camera and local-planner JPEG images under `logging/logs`.
+   Persistent simulation, event, and event-telemetry records are stored in
+   MySQL through `logging/logging_server.py`. Routes remain in the
+   controller-owned `goals.config.json` file.
 
 2. Vite API routes:
-   `web-app/vite.config.ts` reads those files and serves them to the React app
-   through `/api/...` endpoints during local development.
+   `web-app/vite.config.ts` reads live files, proxies database reads to the
+   logging service, validates route mutations, and manages the shared
+   `emergency_stop.flag` signal through `/api/...` endpoints.
 
 3. React UI:
    Files in `web-app/src` fetch those endpoints, store the current values in
@@ -69,10 +72,12 @@ npm run build
 npm run preview
 ```
 
-Use `npm run dev` while developing. Use `npm run build` as the standard
-regression check after changing React, TypeScript, Vite routes, CSS, or package
-metadata. Use `npm run preview` only when you specifically want to inspect the
-production build locally.
+Use `npm run dev` while developing and operating the local prototype. Use
+`npm run build` as the standard regression check after changing React,
+TypeScript, Vite routes, CSS, or package metadata. `npm run preview` can inspect
+the compiled frontend, but it does not install the development-server API
+middleware required for live telemetry, database access, route editing, or
+motion-inhibit control.
 
 ## Main app files
 
@@ -92,8 +97,8 @@ It contains:
 - The fleet status page.
 - The log analysis page and simple line chart.
 - The help page.
-- React hooks for realtime robot data, simulation table data, goal ordering,
-  and README loading.
+- React hooks for unit discovery, realtime robot data, simulation options and
+  tables, goal ordering, motion-inhibit state, and help-guide loading.
 
 Use this file when you want to:
 
@@ -130,8 +135,8 @@ How to modify goal ordering:
 2. Edit `useGoalOrder` for loading and saving behavior.
 3. Edit `goals.ts` for reorder logic or API helpers.
 4. Edit `vite.config.ts` if persistence endpoint behavior changes.
-5. Preserve the full `Goals` payload shape unless you also update the
-   controller-side reader.
+5. Preserve the complete `Goals` and `RobotRoutes` configuration contract unless
+   you also update the controller-side reader.
 
 Important caution:
 
@@ -194,7 +199,7 @@ This file configures Vite and defines the local API routes used by the React app
 For this project, it is both build configuration and a lightweight development
 server backend.
 
-It reads runtime files from:
+Its file-backed routes read live artifacts from:
 
 ```text
 logging/logs
@@ -202,22 +207,30 @@ logging/logs
 
 It currently serves:
 
-- `/api/realtime-panel` from `robot_controller_runs_realtime_panel.jsonl`
-- `/api/local-planner-grid` from `local_planner_grid.jpg`
-- `/api/camera-feed` from `camera_feed.jpg`
-- `/api/simulations` from `simulations.jsonl`
-- `/api/events` from `events.jsonl`
-- `/api/event-telemetry` from `event_telemetry.jsonl`
-- `/api/goals` from `web-app/src/goals.config.json`
-- `/api/readme` from root `README.md`
+- `/api/realtime-units`, which discovers valid, nonempty unit-specific realtime
+  snapshots.
+- `/api/realtime?unit_id=<id>`, which reads
+  `robot_controller_runs_<id>_realtime.jsonl`.
+- `/api/local-planner-grid?unit_id=<id>` and
+  `/api/camera-feed?unit_id=<id>`, which serve the corresponding unit-specific
+  JPEG files.
+- `/api/database-snapshot`, which proxies filtered, consistent MySQL snapshots
+  from the logging service.
+- `/api/simulation-options`, which proxies the available unit/simulation pairs
+  from the logging service.
+- `/api/goals`, which reads and mutates the controller-owned goal configuration.
+- `/api/emergency-stop`, which reads, creates, or removes
+  `logging/logs/emergency_stop.flag`.
+- `/api/help-guide`, which serves `docs/web-app-user-guide.md`.
 
 Use this file when you want to:
 
 - Add a new `/api/...` endpoint for the React app.
-- Change where the app reads runtime files from.
+- Change where the app reads realtime files from.
 - Change how image files are served.
-- Change how JSONL files are served.
+- Change how database requests are proxied to the logging service.
 - Change goal persistence validation or saving behavior.
+- Change the application-level global motion-inhibit signal.
 
 How to add a new read-only endpoint:
 
@@ -231,22 +244,26 @@ How to add a new read-only endpoint:
 
 How to change goal persistence:
 
-1. Keep `isGoalPoint` and `isGoalsConfig` strict enough to reject malformed
-   payloads.
-2. Keep `writeGoalsConfig` atomic with a temporary file and rename.
-3. Preserve the shape:
+1. Keep `isGoalPoint` and `isControllerGoalsConfig` strict enough to reject
+   malformed payloads.
+2. Keep `writeControllerGoalsConfig` atomic with a temporary file and rename.
+3. Preserve both named goals and per-unit routes:
 
 ```json
 {
   "Goals": [
     { "name": "PICKUP_01", "coordinates": [-24, 3.5] }
-  ]
+  ],
+  "RobotRoutes": {
+    "1": ["PICKUP_01"]
+  }
 }
 ```
 
 Important caution:
 
-- The active React app does not use `web-app/app.py`.
+- The operational API middleware is installed by `npm run dev`, not by
+  `npm run preview`.
 - If an endpoint changes, update all matching frontend fetch calls.
 - If a runtime file path changes, check controller-side writers too.
 
@@ -256,35 +273,36 @@ This file owns the simulation table data contract.
 
 It contains:
 
-- Shared table value types.
-- Column definitions for simulations, events, and event telemetry.
-- JSONL parsing.
-- Numeric value detection.
-- Fetch helpers for `/api/simulations`, `/api/events`, and
-  `/api/event-telemetry`.
-- `fetchSimulationTableData()`, which loads all table data in parallel.
+- Shared table value types and column definitions for simulations, events, and
+  event telemetry.
+- Runtime validators and fetch helpers for unit discovery and unit-specific
+  realtime payloads.
+- Refresh interval options for live and database polling.
+- Validation for simulation options and database snapshot responses.
+- `fetchSimulationTableData()`, which loads a filtered database snapshot from
+  `/api/database-snapshot`.
 
 Use this file when you want to:
 
 - Add, remove, or rename a table column.
-- Change how JSONL is parsed.
-- Change how table data is fetched.
+- Change how database snapshots, simulation options, or realtime data are
+  validated and fetched.
 - Change how numeric table cells are detected.
 - Add a new data helper shared between the logs page and table components.
 
 How to add a column:
 
-1. Confirm the JSONL producer writes that key.
+1. Confirm the logging server returns that key from MySQL.
 2. Add `{ key: "...", label: "..." }` to the correct column array.
 3. If the value should affect charts or metrics, also update `App.tsx`.
 4. Run `npm run build`.
 
 Important caution:
 
-- Do not change existing column keys unless the log writer has changed too.
-- `parseJsonLines` currently tolerates concatenated JSON objects by inserting
-  line breaks between adjacent object boundaries. Keep that behavior unless the
-  log format is deliberately changed.
+- Do not change existing column keys unless the database query and logging
+  schema have changed too.
+- Preserve runtime validation when changing a response contract; an HTTP 200
+  response is not accepted automatically if its JSON shape is malformed.
 
 ### `web-app/src/SimulationTable.tsx`
 
@@ -386,7 +404,9 @@ Important caution:
 - Keep this file data-only.
 - If a new point kind is added, update `PointKind`, `LiveMap.tsx`, and CSS
   legend styles in `App.css`.
-- Check that map data stays consistent with controller/world coordinates.
+- `mapData.ts` independently duplicates warehouse bounds, points, and fixed
+  obstacles; no API synchronizes it with the controller or Webots world. Check
+  all corresponding sources whenever these coordinates change.
 
 ### `web-app/src/types.ts`
 
@@ -394,6 +414,8 @@ This file defines the TypeScript shape of realtime robot telemetry.
 
 It currently defines `RobotData`, including:
 
+- `unit_id`
+- `sim_id`
 - `time`
 - `state`
 - `gps`
@@ -405,14 +427,14 @@ It currently defines `RobotData`, including:
 
 Use this file when you want to:
 
-- Add a new field from `/api/realtime-panel`.
+- Add a new field from `/api/realtime?unit_id=<id>`.
 - Remove a field that the controller no longer sends.
 - Make frontend code safer by documenting the exact shape of a realtime payload.
 
 How to add a realtime field:
 
-1. Confirm the controller writes the field to
-   `robot_controller_runs_realtime_panel.jsonl`.
+1. Confirm `RobotLog` writes the field to
+   `robot_controller_runs_<unit_id>_realtime.jsonl`.
 2. Add the field to `RobotData`.
 3. Render it in `App.tsx` or another component.
 4. If it is optional, type it as optional or nullable and handle the missing
@@ -421,7 +443,7 @@ How to add a realtime field:
 Important caution:
 
 - Do not pretend a field exists just because it would be useful. The source of
-  truth is the controller payload served by `/api/realtime-panel`.
+  truth is the unit-specific controller payload served by `/api/realtime`.
 
 ### `web-app/src/goals.ts`
 
@@ -432,11 +454,11 @@ It contains:
 - `GoalPoint`
 - `GoalsConfig`
 - `MoveDirection`
-- `initialGoalPoints`
-- `moveGoal`
-- `buildGoalsConfig`
+- `goalsForUnit`
 - `loadGoalsConfig`
-- `saveGoalsConfig`
+- `moveGoal`
+- `createGoal`
+- `removeGoal`
 
 Use this file when you want to:
 
@@ -447,29 +469,33 @@ Use this file when you want to:
 
 How goal movement currently works:
 
-1. `GoalOrder` in `App.tsx` calls `onMoveGoal`.
-2. `useGoalOrder` calls `moveGoal`.
-3. `moveGoal` swaps a selected goal with the adjacent goal.
-4. `saveGoalsConfig` sends the whole ordered `Goals` payload to `/api/goals`.
-5. `vite.config.ts` validates and writes `goals.config.json`.
+1. `GoalOrder` in `App.tsx` calls `onMoveGoal` with a selected route index.
+2. `useGoalOrder` calls `moveGoal` with the selected unit ID, route index, and
+   direction.
+3. The Vite `/api/goals` handler validates the request and complete controller
+   configuration, then swaps adjacent entries only in that unit's route.
+4. Vite atomically writes the updated controller-owned `goals.config.json` and
+   returns the complete configuration.
+5. React updates its state from the server-confirmed response.
 
 Important caution:
 
-- Keep `moveGoal` predictable and side-effect free.
-- Keep persistence in `saveGoalsConfig`, not inside `moveGoal`.
-- Preserve the full ordered `Goals` payload because the controller reads ordered
-  goals from the same file.
+- Keep unit IDs and route indices validated on both the client and server.
+- Keep creation, movement, and removal serialized in `useGoalOrder` so mutations
+  cannot overlap.
+- Preserve shared named goals when another robot route still references them.
 
-### `web-app/src/goals.config.json`
+### Controller-owned `goals.config.json`
 
-This JSON file is the canonical goal order used by the web app and controller
-workflow.
+The canonical configuration is
+`AGV_Webots_World_and_Controllers/controllers/DefaultController/goals.config.json`.
+The active web app has no separate frontend goals file.
 
 Use this file when you want to:
 
-- Change the default goal order.
+- Change a unit's default route order.
 - Change a goal coordinate.
-- Add or remove a goal, but only if the controller can handle it.
+- Add or remove a named goal and update all affected routes.
 
 Expected structure:
 
@@ -480,7 +506,10 @@ Expected structure:
       "name": "CHARGING_STATION",
       "coordinates": [6.75, -4.5]
     }
-  ]
+  ],
+  "RobotRoutes": {
+    "1": ["CHARGING_STATION"]
+  }
 }
 ```
 
@@ -488,9 +517,9 @@ Important caution:
 
 - Keep `Goals` as a non-empty array.
 - Keep every `coordinates` value as exactly two finite numbers.
-- Be aware that the dashboard can write this file through `/api/goals`.
-- Be aware that controller shutdown logic may also rewrite this file as the
-  canonical ordered goals payload.
+- Keep every `RobotRoutes` entry nonempty and restricted to known goal names.
+- Be aware that the dashboard can write this file through `/api/goals` while
+  each running `DefaultController` reloads it during its control cycle.
 
 ### `web-app/src/main.tsx`
 
@@ -578,24 +607,6 @@ Important caution:
 - If changing it breaks `npm run build`, revert the compiler setting or adjust
   the affected TypeScript code deliberately.
 
-### `web-app/app.py`
-
-This is the older Streamlit dashboard.
-
-For the current React/Vite app, treat this file as legacy/reference code.
-
-Use this file only when you intentionally want to:
-
-- Inspect old dashboard behavior.
-- Compare old Streamlit concepts with the current React implementation.
-- Maintain the old Streamlit dashboard separately.
-
-Important caution:
-
-- Do not add React API routes here.
-- Do not fix current React dashboard data bugs here.
-- Do not assume this file drives `npm run dev`; it does not.
-
 ### `web-app/dist`
 
 This is generated production output from `npm run build`.
@@ -622,7 +633,7 @@ Important caution:
 
 ### Add a new dashboard metric
 
-1. Confirm the value exists in `/api/realtime-panel`.
+1. Confirm the value exists in the unit-specific `/api/realtime` payload.
 2. Add the field to `RobotData` in `types.ts` if needed.
 3. Render it in `DashboardPage` in `App.tsx`.
 4. Add or reuse CSS classes in `App.css`.
@@ -630,7 +641,7 @@ Important caution:
 
 ### Add a new telemetry table column
 
-1. Confirm the JSONL file contains the key.
+1. Confirm the logging server's MySQL snapshot contains the key.
 2. Add the column to `simulationColumns`, `eventColumns`, or
    `telemetryColumns` in `data.ts`.
 3. If the column should appear in a chart or metric, update `App.tsx`.
@@ -679,10 +690,11 @@ Important caution:
 
 ## Data contracts to preserve
 
-### Realtime panel payload
+### Realtime payload
 
-The dashboard expects `/api/realtime-panel` to return a JSON object matching
-`RobotData` in `types.ts`.
+The dashboard expects `/api/realtime?unit_id=<id>` to return one JSON object
+matching `RobotData` in `types.ts`. The `unit_id` in the payload must match the
+requested unit and the file identity.
 
 If this payload changes, update:
 
@@ -694,8 +706,10 @@ If this payload changes, update:
 
 The dashboard expects:
 
-- `/api/local-planner-grid` to serve `logging/logs/local_planner_grid.jpg`
-- `/api/camera-feed` to serve `logging/logs/camera_feed.jpg`
+- `/api/local-planner-grid?unit_id=<id>` to serve
+  `logging/logs/local_planner_grid_<id>.jpg`
+- `/api/camera-feed?unit_id=<id>` to serve
+  `logging/logs/camera_feed_<id>.jpg`
 
 If image filenames or formats change, update:
 
@@ -705,26 +719,32 @@ If image filenames or formats change, update:
 
 ### Tables
 
-The logs page expects:
-
-- `/api/simulations`
-- `/api/events`
-- `/api/event-telemetry`
-
-The columns live in `data.ts`, and the rendering lives in
+The database-backed pages use `/api/simulation-options` to populate unit and
+simulation choices and `/api/database-snapshot` to retrieve simulations, events,
+and event telemetry together. The Vite middleware proxies both routes to
+`logging/logging_server.py`. Normal snapshots contain at most 200 matching rows
+from each table. The columns live in `data.ts`, and the rendering lives in
 `SimulationTable.tsx`.
 
 ### Goals
 
 The goal-order dashboard expects:
 
-- `web-app/src/goals.config.json`
+- `AGV_Webots_World_and_Controllers/controllers/DefaultController/goals.config.json`
 - `/api/goals`
 - `goals.ts`
 - `GoalOrder` and `useGoalOrder` in `App.tsx`
 
-The JSON shape should remain a top-level `Goals` array unless the controller is
-updated too.
+The JSON shape must retain both the top-level `Goals` array and the per-unit
+`RobotRoutes` mapping unless the controller and web app are updated together.
+
+### Application-level global motion inhibit
+
+The control labelled **Emergency Stop** uses `/api/emergency-stop` to manage
+`logging/logs/emergency_stop.flag`. Every running `DefaultController` checks the
+same file once per control cycle and replaces its motion command with zero
+velocities while the flag exists. This is a software-level global motion
+inhibit, not an independent hardware safety channel.
 
 ## Validation checklist
 
@@ -760,8 +780,8 @@ npm run dev
 
 - Do not hand-edit `node_modules`.
 - Do not hand-edit generated files in `dist`.
-- Do not put active React API logic into `web-app/app.py`.
-- Do not change table column keys without checking the JSONL producer.
+- Do not change table column keys without checking the logging-server queries
+  and database schema.
 - Do not change realtime telemetry fields without checking `RobotData` and the
   controller payload.
 - Do not change map point names, point kinds, or coordinates without checking

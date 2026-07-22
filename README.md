@@ -227,18 +227,27 @@ Once started, if you need to manage the database manually, you can re-enter the 
 
 ---
 
-## Real-Time Dashboard
+## AGV Command Center Web App
 
-We have a built-in Streamlit dashboard to monitor the AGV's telemetry, local planning grid, and AI camera feed in real-time.
+The current monitoring interface is the React/Vite application in `web-app/`.
+It provides unit-specific realtime telemetry and images, a multi-robot fleet
+view, controller-owned goal management, an application-level global motion
+inhibit labelled **Emergency Stop**, and simulation/event analysis backed by
+MySQL through the standalone logging service.
 
-**Starting the Dashboard:**
-The dashboard is seamlessly integrated into the controller. **You do not need to start it manually.** When you run the Webots simulation, the `DefaultController` will automatically launch the Streamlit server in the background and open a new browser tab directed to `http://localhost:8501`.
+The web app is a local operational prototype and must be started separately; it
+is not launched by `DefaultController`:
 
-**Stopping the Dashboard:**
-Because it runs in the background, the dashboard will persist even if you stop the Webots simulation (allowing you to restart Webots without losing the dashboard window). 
-If you want to completely terminate the running dashboard and free up its port, open your terminal and run:
 ```bash
-pkill -f "streamlit run .*web-app/app.py"
+cd web-app
+npm run dev
 ```
 
-For more details, see [docs/dashboard.md](docs/dashboard.md).
+Open the URL printed by Vite, normally `http://localhost:5173`. The local API
+routes are implemented by Vite development-server middleware, so
+`npm run preview` does not provide the complete operational application. Start
+MySQL, the logging server, and Webots first when live and persistent data are
+required.
+
+For the complete startup sequence and interface workflow, see
+[docs/web-app-user-guide.md](docs/web-app-user-guide.md).

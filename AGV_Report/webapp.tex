@@ -1,16 +1,254 @@
 \section{Web Application}
 \label{sec:webapp}
 
-The web application provides an operational view of the AGV simulations. It combines the data exposed by the logging pipeline with a visual representation of the warehouse, allowing users to inspect vehicle status, configured goals and the progression of a run.
+The current Web App is a React/Vite prototype designed for local operational use during AGV simulations. It provides a unified interface for observing active robots, managing their configured routes, and inspecting data retained from simulation runs. This subsection describes the application from the operator's perspective; its internal structure and its role within the wider system are addressed separately in the subsequent subsections.
 
-\subsection{Interface Design}
+\subsection{User Interaction with the Web App}
+\label{subsec:webapp-user-interaction}
 
-Describe the principal views of the application and the information each view presents. Explain how the interface supports the workflow of monitoring a live simulation and reviewing a completed one.
+\subsubsection{Startup, Prerequisites, and Access}
 
-\subsection{Data Integration}
+Initial preparation requires the project Python environment to be created with \texttt{./setup.sh}, the frontend dependencies to be installed with \texttt{npm install} from \texttt{web-app/}, and Webots to be configured to use the Python interpreter created by the setup script. The MySQL instance must also contain the schema defined in \texttt{Database\_Structure.sql}. These steps establish the runtime dependencies needed by the controllers, the logging service, and the Web App.
 
-Explain how the web application obtains and transforms simulation data before rendering it. Mention refresh behaviour, data formats and any consistency constraints that affect what users see.
+For normal operation, MySQL is started first, followed by \texttt{logging/logging\_server.py} and then the Webots warehouse simulation. This order is operationally significant because each \texttt{DefaultController} must create a simulation record through the logging service before it is permitted to move. The Web App is started from \texttt{web-app/} with \texttt{npm run dev}; it may also remain open between simulation runs because active robot units are discovered automatically as their data becomes available.
 
-\subsection{Practical Value and Limitations}
+The interface is accessed through the local address printed by Vite, normally \texttt{http://localhost:5173}. In the current implementation, the application APIs are registered by the Vite development server, so \texttt{npm run preview} does not provide the complete operational interface. The system should therefore be regarded as a local operational application and a prototype rather than as a production deployment.
 
-Summarize the value of the dashboard for development and demonstrations. Then state the current limitations, such as dependence on the logging service or any incomplete visualizations, and identify the most useful future improvements.
+\subsubsection{Interaction Model and Available Features}
+
+On desktop displays, the principal pages are reached through the sidebar and top navigation, whereas compact displays use a bottom navigation bar. A fixed page-control dock presents only the selectors and refresh settings relevant to the current view. The Robot selector chooses the unit shown by single-robot pages, while the Simulation selector restricts database-backed information to a specific run or retains the broader \emph{All simulations} view.
+
+The available views and their principal interaction mechanisms are summarized in \cref{tab:webapp-operational-views}. The table distinguishes live operational information from data retrieved from MySQL, since the two sources serve different user tasks and are refreshed independently.
+
+\begin{table}[H]
+  \centering
+  \caption{Operational views of the current Web App.}
+  \label{tab:webapp-operational-views}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.15\textwidth} X X >{\raggedright\arraybackslash}p{0.20\textwidth}@{}}
+    \toprule
+    \textbf{View} & \textbf{Primary purpose} & \textbf{Principal information} & \textbf{Page controls} \\
+    \midrule
+    Dashboard & Monitor and operate one selected robot & Mission status, telemetry, configured route, warehouse map, robot-produced JPEG images, and compact MySQL records & Robot, Simulation, Live refresh, Database refresh \\
+    Map View & Examine the selected robot spatially & Enlarged warehouse map with optional grid, obstacle, path, and goal layers; camera and local-planner images & Robot, Live refresh \\
+    Fleet Status & Compare all currently discovered units & One live status card per unit, including motion, navigation, and error information & Live refresh \\
+    Log Analysis & Review retained simulation data & Simulation, event, and event-telemetry tables; event filtering; linear-velocity and heading-error charts & Robot, Simulation, Live refresh, Database refresh \\
+    Help Center & Provide embedded operating guidance & The rendered content of \texttt{docs/web-app-user-guide.md} & None \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Live refresh can be configured between 50~ms and 1~s, with 50~ms as the default, and controls requests for unit-specific real-time JSONL data and robot-produced JPEG images. Database refresh can be configured between 3~s and 30~s, with 10~s as the default, and controls the retrieval of MySQL snapshots. The selected robot and both refresh intervals are retained by the browser between visits, whereas the selected simulation is local to the current session.
+
+The Dashboard is the principal single-robot workspace. It combines the mission runtime, estimated navigation state, current goal, next local-planner point, current and target velocities, position and control errors, route configuration, warehouse visualization, and the two robot-produced image streams. It also includes compact views of the selected robot's simulations, events, and event telemetry, thereby allowing live behavior and retained records to be inspected without changing page.
+
+The Map View provides a larger spatial representation and permits the user to toggle the grid, obstacles, planned path, and goals, as well as to change the zoom level. Fleet Status instead removes the single-robot selector and creates a summary card for every discovered unit, supporting simultaneous observation of independently operating robots. Log Analysis concentrates on database-backed inspection through tables, event-type filtering, and charts derived from at most the latest 100 event-telemetry rows for the selected simulation; when all simulations are selected, the charts use the highest available simulation identifier for the chosen robot.
+
+\subsubsection{Main Operational Workflow}
+
+After the required services and the Webots world have been started, the operator opens the local Web App and waits for active units to be discovered. A robot is then selected for the Dashboard or Map View, and a simulation may additionally be selected on database-backed pages. The operator can follow the live mission through the map, telemetry, planner state, and image outputs, while the independent database refresh provides progressively updated records of the run.
+
+Goal management is available from the Dashboard and is intended for use during a live simulation. For the selected robot, the operator can move goals earlier or later in the route, append a uniquely named goal with finite coordinates, or remove a goal. The interface prevents deletion of the final route goal and preserves goals shared with another route; accepted changes update \texttt{AGV\_Webots\_World\_and\_Controllers/controllers/DefaultController/goals.config.json}, which the controller reloads while operating. Concurrent manual editing of this file should be avoided while changes are being saved through the Web App.
+
+The desktop sidebar also exposes a global control labelled \emph{Emergency Stop}. In architectural terms, this control is an application-level global motion inhibit: it applies to every active robot using \texttt{DefaultController}, causes motion commands to be replaced by zero linear, angular, and wheel velocities on the next controller cycle, and leaves the Webots simulation running. The inhibited state remains active until the operator selects \emph{Resume Robots}; it is global rather than associated with the robot currently selected in the interface.
+
+Once immediate monitoring is complete, the operator can use Log Analysis to review the selected unit and simulation in greater detail. This progression from unit discovery, through live observation and optional route management, to database-backed review constitutes the principal operational workflow supported by the current prototype.
+
+\subsection{Web App Architecture}
+\label{subsec:webapp-architecture}
+
+\subsubsection{Current State and Architectural Style}
+
+The active Web App is a single-page React application written in TypeScript and built with Vite. Its declared runtime dependencies in \texttt{web-app/package.json} are React, React DOM, React Router, Lucide React, and locally packaged Inter and JetBrains Mono fonts; Vite, the React plugin, and TypeScript provide the development and build toolchain. The application is operational for local simulation monitoring, but its server-side capabilities are installed through Vite's \texttt{configureServer} hook and are therefore available only when the development server is running. Consequently, the implemented functions constitute a local operational prototype, while independently deployable production serving is not implemented.
+
+The implementation follows a compact layered arrangement rather than a conventional separation into independently deployed frontend and backend services. The browser layer renders the interface and holds transient application state, client modules validate and request data, and custom Vite middleware provides a same-origin API over project files and the logging service. This organization reduces the number of runtime processes required for local operation and prevents the browser from accessing the filesystem directly. Its main trade-off is that Vite simultaneously acts as build tool, static application server, and lightweight backend-for-frontend.
+
+The previous Streamlit implementation remains in \texttt{web-app/app.py}, but it is a predecessor and is not part of the current application architecture.
+
+\subsubsection{Frontend Composition}
+
+The HTML document in \texttt{web-app/index.html} supplies the root element, and \texttt{web-app/src/main.tsx} mounts the React component tree. \texttt{main.tsx} also imports the packaged fonts before rendering \texttt{App}. At the root of the component tree, \texttt{App.tsx} creates a \texttt{BrowserRouter} and delegates application coordination to \texttt{RoutedApp}.
+
+\texttt{RoutedApp} is the principal state and orchestration component. It owns the selected robot and simulation, the live and database refresh intervals, the emergency-stop state, and the data returned by the application's custom hooks. It also determines which polling operations and page controls are enabled for the active route. The component combines unit identifiers discovered from real-time files with unit identifiers returned by database simulation options, which permits the same selector to represent both currently reporting and historically recorded units.
+
+The shared application frame is implemented by \texttt{CommandShell} in \texttt{App.tsx}. It renders the top bar, desktop sidebar, responsive mobile navigation, page-control dock, global motion-inhibit control, and the main content region. React Router maps the principal paths to \texttt{DashboardPage}, \texttt{MapPage}, \texttt{FleetPage}, \texttt{LogAnalysisPage}, and \texttt{HelpCenterPage}. This routing model retains one common stateful shell while replacing only the page content, which avoids duplicating selectors, navigation, and global controls.
+
+Most page-level and shared presentational components remain in \texttt{App.tsx}, including metric cards, panels, live-image rendering, goal-route controls, line charts, loading states, and the Markdown renderer used by the Help Center. Two larger concerns are separated into dedicated modules. \texttt{LiveMap.tsx} renders the warehouse as an SVG in compact and expanded variants, while \texttt{SimulationTable.tsx} provides reusable simulation, event, and event-telemetry tables together with event-type filtering. Visual rules for the application are centralized in \texttt{App.css}, including desktop and mobile layouts, cards, tables, map symbols, and responsive behavior.
+
+The resulting frontend has clear component-level boundaries for mapping and database tables, but it remains deliberately centralized around \texttt{App.tsx}. This is consistent with the scale of a prototype and makes the overall control flow directly traceable. It also means that routing, page composition, polling coordination, state ownership, charts, help rendering, and several reusable components share one large module rather than being divided into feature-specific packages.
+
+\subsubsection{Client Data and State Management}
+
+The frontend uses React state and custom hooks instead of an external state-management library. \texttt{useRealtimeUnits}, \texttt{useRobotData}, and \texttt{useFleetRobotData} implement discovery and polling of live unit data, whereas \texttt{useSimulationOptions} and \texttt{useSimulationTables} maintain database-backed selections and snapshots. Polling is route-aware: live or database requests are disabled when the current page does not consume the corresponding data. Timeouts are scheduled after each completed request rather than through overlapping fixed intervals, and cleanup functions cancel scheduled work when a component or route changes.
+
+\texttt{web-app/src/data.ts} defines refresh interval types, table column metadata, response validators, and fetch functions for real-time units, robot telemetry, simulation options, and database snapshots. The real-time payload contract is represented by \texttt{RobotData} in \texttt{web-app/src/types.ts}; it includes the unit and simulation identifiers, pose, GPS coordinates, control errors, current and target velocities, current goal, and next planner point. Responses are checked at runtime before they enter React state, so successful HTTP transport alone is not treated as evidence of a valid payload.
+
+Goal-related browser logic is isolated in \texttt{web-app/src/goals.ts}. This module validates the complete goal configuration and provides typed helpers for loading, creating, moving, and removing route entries. \texttt{useGoalOrder} in \texttt{App.tsx} serializes user interaction at the interface level, exposes loading and saving states, and replaces its local state only with the configuration confirmed by the API. Browser \texttt{localStorage} is used narrowly for the selected robot and refresh intervals; simulation choice and fetched operational data remain transient React state.
+
+The layered organization of these components is summarized in \cref{fig:webapp-layered-architecture}. The diagram represents dependencies within the current Web App and the boundary through which it reaches project-owned data and services; the wider system interactions are reserved for the subsequent subsection.
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+    node distance=0.55cm,
+    layer/.style={
+      draw,
+      rounded corners=2pt,
+      align=center,
+      minimum height=1.0cm,
+      text width=0.82\textwidth,
+      inner sep=6pt,
+      font=\small
+    },
+    flow/.style={-Latex, thick}
+  ]
+    \node[layer] (entry) {\textbf{Entry and routing}\\\texttt{index.html}, \texttt{main.tsx}, \texttt{BrowserRouter}};
+    \node[layer, below=of entry] (coordination) {\textbf{Application coordination}\\\texttt{RoutedApp} and \texttt{CommandShell} in \texttt{App.tsx}: shared state, route-aware polling, navigation, selectors, and global controls};
+    \node[layer, below=of coordination] (presentation) {\textbf{Views and client modules}\\Page and reusable components in \texttt{App.tsx}, \texttt{LiveMap.tsx}, and \texttt{SimulationTable.tsx}; validated access through \texttt{data.ts}, \texttt{goals.ts}, and \texttt{types.ts}};
+    \node[layer, below=of presentation] (middleware) {\textbf{Local API boundary}\\Vite development-server middleware in \texttt{vite.config.ts}: request validation, file access, configuration mutation, and logging-service proxying};
+    \node[layer, below=of middleware] (sources) {\textbf{Project-owned sources}\\Unit-specific real-time JSONL files and JPEG images, controller goal configuration, global motion-inhibit flag, help documentation, and logging-service API};
+
+    \draw[flow] (entry) -- (coordination);
+    \draw[flow] (coordination) -- (presentation);
+    \draw[flow] (presentation) -- node[right, font=\scriptsize] {same-origin \texttt{/api/...}} (middleware);
+    \draw[flow] (middleware) -- (sources);
+  \end{tikzpicture}
+  \caption{Layered organization of the current React/Vite Web App.}
+  \label{fig:webapp-layered-architecture}
+\end{figure}
+
+\subsubsection{Local API and Persistence Boundary}
+
+The server-facing portion of the Web App is implemented as a custom Vite plugin in \texttt{web-app/vite.config.ts}. Its middleware exposes endpoints for discovering robots, retrieving a selected unit's real-time record, serving robot-produced images, loading and mutating goals, reading and changing the application-level global motion inhibit, retrieving the embedded user guide, and proxying database queries. Responses for changing or frequently updated resources are marked with \texttt{Cache-Control: no-store}, while method and query validation reject requests outside the expected contract.
+
+File-backed access is unit-aware. The middleware discovers files matching \texttt{robot\_controller\_runs\_<id>\_realtime.jsonl}, normalizes numeric identifiers, and accepts a unit only when the file contains one valid record whose \texttt{unit\_id} matches the filename. Camera and local-planner requests are likewise resolved to unit-specific JPEG paths. These checks prevent one selected robot from silently receiving another unit's live payload or image.
+
+Configuration mutations receive stronger server-side checks because they modify controller-owned state. The \texttt{/api/goals} handlers validate request bodies and the complete \texttt{Goals}/\texttt{RobotRoutes} structure, preserve route invariants, and replace \texttt{goals.config.json} through a temporary file and atomic rename. The \texttt{/api/emergency-stop} endpoint similarly represents the global inhibit through the presence or absence of \texttt{logging/logs/emergency\_stop.flag}. The browser therefore issues intent through HTTP, while filesystem paths and mutation rules remain confined to the local middleware.
+
+Database-backed requests follow a different path. The \texttt{/api/database-snapshot} and \texttt{/api/simulation-options} middleware routes forward their query strings to \texttt{logging/logging\_server.py}, using \texttt{LOGGING\_SERVER\_URL} when configured and \texttt{http://127.0.0.1:8080} otherwise. The Web App consequently does not contain database credentials or issue SQL directly; it consumes the logging service's JSON interface. This preserves a service boundary between presentation concerns and persistent-data ownership even though the Vite middleware remains local to the frontend development process.
+
+\subsubsection{Map Representation and Current Limitation}
+
+The map subsystem separates rendering from static geometry. \texttt{LiveMap.tsx} receives a validated \texttt{RobotData} object and combines the current pose, goal, and next planner point with warehouse bounds, fixed obstacles, and named locations exported by \texttt{mapData.ts}. It converts warehouse Y coordinates to the downward-positive SVG coordinate system and derives zoomed view boxes around the selected robot. The component does not perform network requests, which keeps it reusable between the Dashboard and Map View.
+
+The static geometry in \texttt{web-app/src/mapData.ts} is, however, an independent duplication of warehouse information also represented elsewhere in the project. No API or generation step synchronizes its bounds, points, or obstacle rectangles with the Webots world or controller configuration. The current display is therefore correct only while these sources remain manually aligned, and a change to the simulated warehouse can leave the Web App map inconsistent without producing a runtime error. This is an architectural limitation of the present prototype rather than an unverified defect in the displayed coordinates.
+
+\subsection{Role of the Web App in the Overall Architecture}
+\label{subsec:webapp-overall-role}
+
+\subsubsection{Architectural Position and Dependencies}
+
+The Web App forms the human-facing observation and configuration layer of the AGV system. It does not participate in localization, perception, planning, or low-level control, all of which remain inside each \texttt{DefaultController} process. Instead, it translates controller outputs and logging records into operator-oriented views and translates a limited set of user actions into shared configuration or inhibit state. Its position is therefore adjacent to the control loop rather than inside it.
+
+The application depends on three categories of project-owned resources. First, running controllers produce unit-specific real-time telemetry and image artifacts under \texttt{logging/logs}. Second, \texttt{logging/logging\_server.py} provides the persistent read interface backed by MySQL. Third, the controller-owned \texttt{goals.config.json} file and the shared motion-inhibit flag support the two control-oriented interactions exposed by the interface. The local Vite middleware in \texttt{web-app/vite.config.ts} mediates all three categories, so the browser communicates through same-origin HTTP endpoints rather than through direct filesystem, database, or controller access.
+
+This role makes the Web App a consumer of several subsystems without making it their owner. The controllers own the current robot state and planned route execution, the logging infrastructure owns committed simulation records, and Webots remains the simulation runtime. The Web App owns presentation state such as the current page, selected unit and simulation, and refresh intervals. This separation is visible in the code because no React module imports controller or logging Python code, and no browser request issues SQL or invokes Webots APIs directly.
+
+\subsubsection{Live Monitoring Flow}
+
+Live telemetry originates in the control cycle of \texttt{AGVSimulation.run()} in \texttt{DefaultController.py}. After perception, localization, planning, safety limiting, and command calculation, the controller calls \texttt{RobotLog.capture\_telemetry()} with the resulting state, current goal, command, and next low-level waypoint. \texttt{logging/logger/robot\_log.py} serializes this information into the unit-specific file \texttt{robot\_controller\_runs\_\{unit\_id\}\_realtime.jsonl}. The file contains one current record rather than a history and is atomically replaced at intervals of at least 0.05~s of simulation time.
+
+The Vite endpoint \texttt{/api/realtime-units} scans these filenames and accepts only nonempty, single-record files whose payload identifier matches the normalized identifier in the filename. \texttt{/api/realtime} then resolves one validated unit identifier to its corresponding record. In the browser, \texttt{useRealtimeUnits} refreshes unit discovery every three seconds, while \texttt{useRobotData} and \texttt{useFleetRobotData} poll selected or discovered units at the operator-configured live interval. \texttt{data.ts} validates the returned structure against the expected \texttt{RobotData} fields before the value is stored and rendered.
+
+The live image paths bypass \texttt{RobotLog} but follow the same unit-based identity convention. The perception implementation in \texttt{perception/vision.py} writes \texttt{camera\_feed\_\{unit\_id\}.jpg}, while the low-level planner visualization in \texttt{planning/low\_level/grid\_planner.py} writes \texttt{local\_planner\_grid\_\{unit\_id\}.jpg}. The Vite routes \texttt{/api/camera-feed} and \texttt{/api/local-planner-grid} serve these files with caching disabled, and the React \texttt{LiveImage} component includes the selected unit and current time in each request. Telemetry and images can consequently be refreshed independently even though both are produced by the same controller execution.
+
+When a controller stops, its \texttt{finally} block calls \texttt{RobotLog.clear\_realtime()}, leaving the unit's real-time file empty. Subsequent discovery requests exclude that unit unless it remains available through database simulation options, in which case the interface can still expose its committed history but reports its live signal as unavailable. This behavior distinguishes robot presence from historical identity and prevents a stopped robot's final pose from being presented as current.
+
+\subsubsection{Persistent Data Flow}
+
+Persistent data follows the logging architecture described in \cref{sec:logger-architecture,sec:logger-data-flow,sec:logger-read-api}. During controller initialization, \texttt{RobotLog.start()} sends \texttt{POST /start} to the logging service. The service creates a \texttt{Simulations} row in MySQL and returns its positive \texttt{sim\_id}; if this exchange does not succeed within the configured retries, \texttt{DefaultController} stops the motors and refuses to enter normal operation. The database identity is therefore established before the Web App can observe a moving robot.
+
+During the run, the controller retains discrete events and their associated telemetry in memory and normally sends them to \texttt{POST /save} every five seconds. Each accepted save updates the existing \texttt{Simulations} summary and inserts the corresponding \texttt{Events} and \texttt{EventTelemetry} rows in one transaction. Event telemetry is therefore a snapshot associated with a logged event rather than a copy of every 0.05~s real-time update. This distinction explains why the live and database-backed displays can show different temporal resolutions without representing contradictory sources.
+
+The Web App retrieves committed data through two Vite proxy routes. \texttt{/api/simulation-options} forwards to the logging service to obtain the unit-to-simulation mapping used by the selectors, and \texttt{/api/database-snapshot} forwards the selected \texttt{unit\_id} and optional \texttt{sim\_id}. The logging service executes the simulations, events, and event-telemetry queries within one read-only consistent snapshot and returns at most the most recent 200 matching rows from each table. \texttt{data.ts} validates the combined response before \texttt{SimulationTable.tsx}, the Dashboard, or Log Analysis renders it.
+
+This path deliberately retains MySQL as the authoritative source for committed Web App views. The browser does not connect to MySQL directly. Instead, the logging service owns database credentials, filtering, serialization, transaction consistency, and the read limit, while Vite supplies a same-origin boundary for the frontend. The resulting delay of up to a logging flush interval is accepted for historical and tabular data because the separate real-time channel provides the current operational state.
+
+\subsubsection{Goal Configuration Flow}
+
+Goal management is a bidirectional interaction between the Web App and the controller-owned task configuration. A Dashboard action is converted by \texttt{goals.ts} into a \texttt{GET}, \texttt{POST}, \texttt{PUT}, or \texttt{DELETE} request to \texttt{/api/goals}. The Vite handler validates the unit identifier, operation, named goals, finite coordinates, and complete per-unit route structure before replacing \texttt{AGV\_Webots\_World\_and\_Controllers/controllers/DefaultController/goals.config.json} atomically. React then adopts the server-confirmed configuration rather than assuming that the requested change succeeded.
+
+On the controller side, \texttt{Task.refresh()} in \texttt{task.py} reloads one validated route snapshot at the beginning of every control cycle and retains the current numeric route position within the new route length. This mechanism makes Web App changes visible during a live simulation without a direct command channel or controller restart. If a configuration is temporarily invalid, the controller reports a warning and retains its last valid snapshot for that cycle, while the Vite endpoint normally prevents the interface itself from writing an invalid structure. The design therefore assigns validation to both sides of the shared file boundary.
+
+The architectural effect of a route change remains limited to task definition. The Web App does not calculate a path, select wheel velocities, or bypass perception and safety processing; it changes the ordered goals that the existing controller pipeline subsequently interprets. This preserves controller ownership of motion while allowing an operator to influence mission-level intent.
+
+\subsubsection{Global Motion-Inhibit Flow}
+
+The other write-oriented interaction is the control labelled \emph{Emergency Stop}. A browser \texttt{POST} to \texttt{/api/emergency-stop} causes Vite to create \texttt{logging/logs/emergency\_stop.flag}, while \texttt{DELETE} removes it and \texttt{GET} reports its presence. Each active \texttt{DefaultController} checks the same path once per control cycle after normal command calculation and the moving-obstacle safety limiter. While the flag exists, the controller replaces the linear, angular, and wheel velocities with zeros before sending the command to the motors.
+
+This is an application-level global motion inhibit rather than a selected-robot command. Its global behavior follows from a single shared flag inspected independently by every \texttt{DefaultController}; no central fleet coordinator distributes a stop message. The Web App can confirm the filesystem state returned by its API, but that response is not an independent measurement of physical or simulated motor state. Accordingly, the mechanism is an operational software control within the local prototype and not a separate hardware safety channel.
+
+\subsubsection{Integration Rationale and Failure Boundaries}
+
+The overall integration separates information by required temporal and consistency properties. Unit-specific files support low-latency, overwrite-in-place telemetry and images, whereas the logging service and MySQL support transactional history, filtering, and cross-table consistency. Goal and inhibit files provide simple bidirectional coordination for processes already sharing the same project filesystem. This combination is economical for a local Webots prototype and avoids introducing a message broker or a dedicated production backend.
+
+The same choices define explicit failure boundaries. A missing or malformed real-time record affects live discovery and monitoring but does not remove committed database records. Loss of the logging-service read path prevents database-backed views from refreshing, while controller-side buffering can tolerate a transient persistence failure after a simulation has started. Goal management and the global inhibit depend on Vite and the controllers sharing the expected filesystem paths, so these interactions are tightly coupled to same-host execution and the current directory layout.
+
+No fleet-level planning or command arbitration is implemented in the Web App. Fleet Status aggregates independently produced unit snapshots, and the global inhibit is the only application action intentionally shared by all active controllers. The Web App's overall role is therefore supervisory and observational, with narrowly constrained mission-configuration and motion-inhibit capabilities rather than general remote control of the robots.
+
+\subsection{Future Developments}
+\label{subsec:webapp-future-developments}
+
+\subsubsection{Distributed Architecture for Physical Robots}
+
+The principal future development is the replacement of the current same-host, shared-filesystem architecture with a distributed architecture suitable for physical robots. Each robot would continue to execute perception, localization, planning, control, and safety functions locally, but it would no longer depend on files shared with the Web App. Communication would instead be divided between two network services: an extended logging server for authoritative and persistent information, and an MQTT server for real-time publication and notification. The Web App would communicate with these services rather than with robot-owned files.
+
+The robot would contain no persistently stored warehouse map or goal configuration. At every startup it would query the extended logging server for the latest versions, validate them, and retain the accepted values in memory for the duration of its operation. Failure to retrieve or validate either resource would prevent the robot from beginning motion. Once initialization succeeds, the control loop would use its in-memory configuration and would therefore remain independent of ordinary network latency.
+
+\subsubsection{Extended Logging and Configuration Server}
+
+The existing logging server would retain responsibility for simulation and event persistence while becoming the authoritative source for non-real-time system data. Its HTTP API would serve committed logs, robot goals, and the warehouse map to both the Web App and the robots. MySQL would remain behind this service for structured logging data, so neither robots nor browsers would access the database directly. This extension preserves the existing client--server logging boundary while removing the Web App's and controllers' dependence on a common directory layout.
+
+The warehouse map would be stored by the server as one versioned JSON configuration containing the coordinate frame, boundaries, fixed obstacles, and named operational locations required by its consumers. Both the Web App and every robot would retrieve this same definition at startup, eliminating the independent geometry currently compiled into \texttt{web-app/src/mapData.ts}. The Web App would treat the map as read-only: modifying warehouse geometry would remain a deliberate server-side administrative operation rather than an operator feature. Because such changes are expected to be rare, an updated map version would take effect when the Web App and robots next start, avoiding replacement of navigation geometry during an active mission.
+
+Goals would also become server-owned, but unlike the warehouse map they would remain editable through the Web App. A goal operation would be sent to the server through HTTP, validated, and committed before the server reported success to the browser. Confirmation from the server would mean that the authoritative configuration had changed; it would not yet prove that a robot had received or applied the change. The subsequent distribution step would use MQTT and an explicit robot acknowledgement.
+
+\subsubsection{MQTT Real-Time Communication}
+
+MQTT, or Message Queuing Telemetry Transport, is a lightweight publish--subscribe messaging protocol. Its server component is normally called a \emph{broker}: publishers send messages to named topics, and the broker forwards each message to every connected client subscribed to the corresponding topic. Publishers and subscribers therefore do not need direct connections to one another. This decoupling is appropriate for a fleet in which robots and browser clients may connect, disconnect, or subscribe to different unit-specific data streams independently.
+
+In the proposed architecture, each robot would publish its current telemetry and images to unit-specific MQTT topics. The Web App would subscribe only to the robots relevant to the active views and would receive these messages through an MQTT connection supported by the browser, such as MQTT over WebSockets. The specific image encoding, message frequency, and payload transport would remain an implementation decision; the architectural requirement is only that real-time images and telemetry pass through the broker rather than a shared filesystem. MQTT would not become an authoritative historical store, because persistent records would remain under the logging server and MySQL.
+
+Robots would also subscribe to topics carrying configuration-change notifications and application commands. After committing a goal modification, the extended logging server would publish a message identifying the changed resource and its new version. A robot receiving that message would retrieve the authoritative goals from the server, validate them, apply them in memory, and publish an acknowledgement. The interface could consequently distinguish a change that was merely saved by the server from one confirmed as received and applied by a particular robot.
+
+The same path would distribute the control labelled \emph{Emergency Stop}, while preserving its classification as an application-level global motion inhibit. The server would record the desired inhibit state and publish the change through MQTT; subscribed robots would apply it locally and acknowledge the resulting state. This network mechanism would remain distinct from the independent safety-rated emergency-stop hardware required by physical robots. If the broker were unavailable after an authoritative change, the server would need to retain the pending notification and retry publication so that a successful commit could not be silently lost.
+
+\subsubsection{Proposed Information Flows}
+
+The proposed division of responsibilities is shown in \cref{fig:webapp-future-distributed-architecture}. HTTP communication carries persistent logs, startup configuration, queries, and validated goal mutations. MQTT carries transient live information, change notifications, acknowledgements, and the software motion-inhibit state. The logging server remains the authority for durable information, whereas the broker provides timely delivery without acquiring ownership of that information.
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+    component/.style={
+      draw,
+      rounded corners=2pt,
+      align=center,
+      minimum height=1.15cm,
+      text width=3.3cm,
+      inner sep=5pt,
+      font=\small
+    },
+    flow/.style={-Latex, thick},
+    exchange/.style={Latex-Latex, thick},
+    annotation/.style={align=center, fill=white, inner sep=1.5pt, font=\scriptsize}
+  ]
+    \node[component] (web) at (0,0) {\textbf{React Web App}\\Operator views and goal operations};
+    \node[component] (server) at (5.2,0) {\textbf{Extended logging server}\\HTTP API and authoritative state};
+    \node[component] (robot) at (10.4,0) {\textbf{Physical robot}\\Local control and in-memory configuration};
+    \node[component] (mqtt) at (2.6,-3.3) {\textbf{MQTT broker}\\Unit topics and change notifications};
+    \node[component] (storage) at (7.8,-3.3) {\textbf{Authoritative storage}\\MySQL logs, goals, and versioned warehouse JSON};
+
+    \draw[exchange] (web) -- node[annotation, above] {queries and validated\\goal mutations} (server);
+    \draw[exchange] (server) -- node[annotation, above] {startup configuration\\and persistent logs} (robot);
+    \draw[flow] (server) -- node[annotation, left] {changes} (mqtt);
+    \draw[flow] (mqtt) -- node[annotation, left] {subscribed live data} (web);
+    \draw[exchange] (mqtt) -- node[annotation, below] {live publications, notifications,\\commands, and acknowledgements} (robot);
+    \draw[exchange] (server) -- node[annotation, right] {managed access} (storage);
+  \end{tikzpicture}
+  \caption{Proposed distributed architecture for the Web App and physical robots.}
+  \label{fig:webapp-future-distributed-architecture}
+\end{figure}
+
+At startup, the Web App would obtain the current warehouse map, goals, and committed records from the extended logging server before subscribing to the required robot topics. Each robot would likewise obtain and validate the latest map and goals before enabling motion, then publish live telemetry and images through MQTT and persistent event batches through HTTP. This arrangement gives the Web App one authoritative source for non-real-time data and one explicitly transient channel for live monitoring.
+
+The proposed architecture also provides a common integration boundary for simulation and physical deployment. A simulated controller could use the same HTTP and MQTT contracts as a physical robot, allowing the distributed behavior to be tested in Webots before hardware integration. The transition would therefore replace transport and configuration ownership without transferring navigation or safety decisions from the robot to the Web App.

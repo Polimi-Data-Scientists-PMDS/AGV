@@ -103,16 +103,16 @@ controls that affect the current page:
 
 | Page | Available controls |
 |---|---|
-| Dashboard | Robot, Live refresh, Database refresh |
+| Dashboard | Robot, Simulation, Live refresh, Database refresh |
 | Map View | Robot, Live refresh |
 | Fleet Status | Live refresh |
 | Log Analysis | Robot, Simulation, Live refresh, Database refresh |
 | Help Center | None |
 
 - **Robot** selects one unit for pages that show a single robot.
-- **Simulation** selects one simulation for the selected unit. `All
-  simulations` keeps tables broad but charts use the selected unit's newest
-  simulation.
+- **Simulation** selects one simulation for the selected unit on pages that
+  display database records. `All simulations` keeps tables broad, while the Log
+  Analysis charts use the selected unit's newest simulation.
 - **Live refresh** controls unit telemetry and image requests. Choices are
   50 ms, 100 ms, 250 ms, 500 ms, and 1 s; 50 ms is the default.
 - **Database refresh** controls MySQL snapshot requests. Choices are 3 s, 5 s,
@@ -184,8 +184,8 @@ waiting or unavailable rather than showing another robot's data.
 
 ## Log Analysis
 
-Log Analysis reads persistent data from MySQL, not from the JSONL mirrors.
-Select a unit and optionally a simulation in the bottom dock.
+Log Analysis reads persistent data from MySQL. Select a unit and optionally a
+simulation in the bottom dock.
 
 The page shows simulation rows, events, event telemetry, and two charts:
 
@@ -199,15 +199,11 @@ unit's highest simulation ID. Fewer rows are shown when fewer samples exist.
 Event telemetry is recorded when an event is logged; it is not the continuous
 50 ms realtime stream.
 
-### Normal And Full Database Loads
+### Database Snapshot Limit
 
-Automatic snapshots return at most 200 rows from each of the three tables. Use
-**Load all matching records** only when necessary. The confirmation warns that a
-large query can temporarily block logging-server database access, consume memory,
-or make the page slow.
-
-After a full load, automatic database refresh is paused. Choose **Resume latest
-200** to return to normal polling.
+Each database refresh returns at most 200 matching rows from each of the three
+tables. The current interface does not provide an unlimited-history request;
+narrow the result by selecting a robot and, when needed, a simulation.
 
 ## Live Data And Common Problems
 

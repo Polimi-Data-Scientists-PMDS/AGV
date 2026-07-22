@@ -1085,7 +1085,7 @@ class LocalGridVisualizer:
         tip = (int(center + 35 * np.cos(robot_theta)), int(center - 35 * np.sin(robot_theta)))
         cv2.arrowedLine(display_image, (center, center), tip, (0, 0, 255), 3)
 
-        # Save the grid image to disk so the Streamlit dashboard can access it
+        # Save the grid image to disk so the React/Vite web app can access it.
         os.makedirs(LOGS_DIR, exist_ok=True)
         cv2.imwrite(
             os.path.join(LOGS_DIR, f"local_planner_grid_{self.unit_id}.jpg"),
