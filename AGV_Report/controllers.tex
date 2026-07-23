@@ -1,16 +1,113 @@
 \section{Current Controller}
 \label{sec:controllers}
 
-This section describes the current AGV controller implemented for the Webots warehouse simulation. The controller integrates perception, localization, planning and low-level motion control to move each vehicle through the environment while accounting for configured goals and dynamic obstacles.
+This section describes the current AGV controller implemented for the Webots warehouse simulation. The controller integrates perception, localization, planning and low-level motion control to move each vehicle through the environment while accounting for configured goals and dynamic obstacles. Unlike the monolithic scripts described in Section~\ref{sec:old-controller}, the current implementation is organised as a set of cooperating modules behind explicit interfaces, so that each stage of the sense--think--act loop can be reasoned about, replaced or tested in isolation. Each vehicle in the warehouse runs an independent copy of this controller as a separate Webots process; there is no central coordinator, and all cooperation between vehicles is mediated indirectly through the shared world and the logging service described in \cref{sec:logger}.
 
-\subsection{Architecture}
+\subsection{Architecture and Control Loop}
+\label{subsec:controllers-architecture}
 
-Describe the controller as a sequence of cooperating components. Start from the information received from Webots and explain how sensor data is transformed into a state estimate, a route and finally motor commands. Refer to implementation details only when they clarify an engineering choice or a relevant limitation.
+The controller is driven by the \texttt{AGVSimulation} class in \texttt{DefaultController.py}, which owns one instance of each subsystem and executes a single fixed sequence once per simulation step. On construction the controller first establishes its identity: the Webots robot name is parsed by \texttt{parse\_robot\_unit\_id} into a numeric \texttt{unit\_id}, and a name that does not match the expected \texttt{PIONEER\_3\_<number>} pattern causes the controller to refuse to move rather than run with an ambiguous identity. This identifier is the key that ties a running vehicle to its configured route, its logging stream and its per-unit image outputs, and it is what allows several structurally identical controllers to coexist in the same world without interfering.
 
-\subsection{Planning and Control}
+The controller depends on a small number of collaborators, each responsible for one concern. The \texttt{HardwareInterface} (implemented by \texttt{WebotsInterface}) wraps the Webots device API and exposes typed accessors for the motors, wheel encoders, GPS, inertial unit, lidar and camera, so that no control logic calls \texttt{robot.getDevice} directly. \texttt{Perception} converts raw device readings into a \texttt{SensorData} record; \texttt{Localization} turns that record into a filtered \texttt{RobotState}; \texttt{Task} supplies the current goal; the high- and low-level planners produce a route and a local path; \texttt{Control} converts the path into a motor command; and \texttt{RobotLog} records telemetry. The concrete planner classes are selected once, statically, through the \texttt{Task.hl\_planner\_class} and \texttt{Task.ll\_planner\_class} attributes, which currently bind to \texttt{VisGraphPlanner} and \texttt{GridPlanner} respectively. This indirection keeps the main loop agnostic to which planning strategy is in use and is what allows the alternative \texttt{SectorPlanner} (the direct descendant of the reactive avoidance logic discussed in Section~\ref{sec:old-controller}) to be substituted without touching the control loop.
 
-Explain the high-level and low-level planning responsibilities, including how the controller selects waypoints, reacts to blocked paths and completes a goal. Use equations only when they make an algorithm or a measurable quantity clearer; otherwise, prefer a precise prose explanation.
+Each iteration of the loop, guarded by \texttt{hardware.is\_alive()}, performs the same ordered pipeline. The controller reads the current simulation time, refreshes the task snapshot, perceives the environment, updates its state estimate, selects the active goal, plans a global route and then a local path, computes a motion command, applies the moving-obstacle safety limiter, checks the emergency-stop signal, and finally actuates the motors and captures telemetry. \Cref{fig:control-loop} summarises this data flow. Ordering the stages this way enforces a strict information dependency: a command is only ever issued from a path that was planned against the most recent state estimate, which in turn was derived from sensor data captured in the same step.
 
-\subsection{Observed Behaviour}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  box/.style={rectangle, draw=black!70, rounded corners=2pt, fill=white,
+              align=center, font=\small, minimum width=25mm, minimum height=10mm,
+              inner sep=1mm},
+  io/.style={rectangle, draw=black!45, dashed, rounded corners=2pt, fill=black!4,
+             align=center, font=\footnotesize\itshape, minimum width=25mm,
+             minimum height=9mm, inner sep=1mm},
+  flow/.style={-{Latex[length=2.4mm]}, line width=0.7pt},
+  side/.style={-{Latex[length=2.2mm]}, line width=0.5pt, dashed, draw=black!55}
+]
+  % top row, left to right
+  \node[box] (perc) {Perception};
+  \node[box, right=10mm of perc] (loc) {Localization};
+  \node[box, right=10mm of loc] (goal) {Goal\\selection};
+  \node[box, right=10mm of goal] (hl) {Global planner\\{\footnotesize (VisGraph)}};
+  % bottom row, right to left
+  \node[box, below=14mm of hl] (ll) {Local planner\\{\footnotesize (Grid)}};
+  \node[box, left=10mm of ll] (ctrl) {Motion\\control};
+  \node[box, left=10mm of ctrl] (safe) {Safety limiter\\+ e-stop};
+  \node[box, left=10mm of safe] (motor) {Motors};
+  % side inputs and outputs
+  \node[io, above=9mm of perc] (sens) {Lidar, GPS, IMU,\\camera, encoders};
+  \node[io, below=9mm of ctrl] (tele) {Telemetry log};
+  % main flow
+  \draw[flow] (perc) -- (loc);
+  \draw[flow] (loc) -- (goal);
+  \draw[flow] (goal) -- (hl);
+  \draw[flow] (hl) -- (ll);
+  \draw[flow] (ll) -- (ctrl);
+  \draw[flow] (ctrl) -- (safe);
+  \draw[flow] (safe) -- (motor);
+  % side flows
+  \draw[flow] (sens) -- (perc);
+  \draw[side] (ctrl) -- (tele);
+  \draw[side] (motor.west) -- ++(-8mm,0) |- (perc.west)
+        node[pos=0.5, left, font=\footnotesize\itshape, text=black!55, align=center] {next\\step};
+\end{tikzpicture}
+\caption{Per-step data flow of the current controller, read as a single pass from the sensors (top) back to the motors and round to the next step. Perception and localization produce the state estimate that both planners consume; the global route is refined into a local path, converted into a wheel command, and passed through the safety limiter and emergency-stop check before actuation, while telemetry is logged along the way.}
+\label{fig:control-loop}
+\end{figure}
 
-Summarize the behaviour observed during representative simulations. State what worked reliably, identify situations that required special handling and connect each limitation to its likely technical cause.
+\subsection{Perception}
+\label{subsec:controllers-perception}
+
+The \texttt{Perception} module reads every sensor once per step and assembles the results into a single immutable \texttt{SensorData} snapshot, so that all downstream stages observe a consistent view of the same instant. The snapshot carries the wheel-encoder deltas, the raw GPS position, the inertial-unit yaw, the lidar point cloud and the camera image, together with the time delta since the previous perception call. Bundling these readings into one object avoids the class of bug where localization and planning inadvertently read sensors at slightly different times within the same step.
+
+Object detection is an optional augmentation layered on top of the geometric sensors. When enabled through \texttt{VisionConfig}, an \texttt{ObjectDetector} runs a YOLOv8 ``nano'' network over the camera image and returns simple \texttt{Detection} records restricted to the person and forklift classes, with the network's ``truck'' label remapped to ``forklift'' to match the warehouse domain. Because neural inference is far more expensive than the simulation timestep, detection is throttled to roughly ten frames per second and transparently uses a CUDA or Apple-Silicon accelerator when one is available, falling back to the CPU otherwise. The detector also writes an annotated camera frame to disk for the monitoring web application described in \cref{sec:webapp}. It is important to note the division of labour here: the lidar is the primary and always-present source of obstacle geometry, whereas vision only contributes \emph{semantic labels} for obstacles the geometry pipeline has already found, and the controller remains able to navigate when detection is disabled or returns nothing.
+
+\subsection{Localization}
+\label{subsec:controllers-localization}
+
+The \texttt{Localization} module maintains the vehicle's pose in the same absolute world frame used by the map and the GPS, producing a \texttt{RobotState} that records position, heading, linear velocity and angular velocity. Each step begins with a differential-drive odometry prediction: the left and right wheel-encoder deltas are converted into a centre displacement and a heading change, a small dead-band suppresses encoder noise, and the pose is advanced by integrating that motion from the previous estimate. This prediction alone would accumulate unbounded drift over a long warehouse run, so it is corrected against two absolute references.
+
+The correction is a weighted fusion with a disagreement safeguard rather than a plain average. For position, the module compares the predicted pose against the GPS reading: when the two disagree by more than \texttt{position\_snap\_threshold\_m} the estimate is snapped directly to GPS, on the assumption that odometry has drifted too far to be trusted, and otherwise the two are blended using \texttt{gps\_weight}. Heading is treated the same way, blending the inertial-unit yaw with the odometric heading under \texttt{yaw\_weight} unless the angular disagreement exceeds \texttt{yaw\_snap\_threshold\_rad}, in which case the estimate snaps to the measured yaw. This design keeps the estimate smooth during normal operation while still guaranteeing a bounded error, and it is a deliberate generalisation of the fixed, GPS-only fusion identified as a limitation of the earlier controllers in Section~\ref{sec:old-controller}. The velocity fields are left as the encoder-derived prediction, since the absolute sensors provide position and heading but not a direct velocity measurement.
+
+\subsection{Goal and Route Management}
+\label{subsec:controllers-goals}
+
+Routes are data, not code. The \texttt{Task} module loads a validated snapshot from \texttt{goals.config.json}, which declares a set of named locations under \texttt{Goals} and, under \texttt{RobotRoutes}, an ordered list of goal names for each vehicle keyed by unit identifier. Loading is strict: the parser rejects malformed coordinates, duplicate goal names, non-numeric route keys and routes that reference an undefined location, and a vehicle whose unit has no configured route refuses to run. Externalising routes in this way decouples warehouse layout from controller logic, so pickup and dropoff points can be added or reordered without editing Python, and it is what makes the per-robot route editing exposed by the web application possible.
+
+The task snapshot is re-read at the start of every control cycle through \texttt{Task.refresh}. If the file is temporarily unreadable or invalid at that moment, the controller logs a warning and retains the last valid snapshot rather than failing, which tolerates the brief inconsistency of an external tool rewriting the file mid-run. Goal advancement is handled in the loop by \texttt{\_\_get\_updated\_goal}: when the distance from the state estimate to the active goal falls below \texttt{goal\_reached\_thresh}, the event is logged, the route index is advanced modulo the route length, and the next goal becomes active. Because the index wraps, each vehicle patrols its configured route indefinitely.
+
+\subsection{High-Level Planning}
+\label{subsec:controllers-highlevel}
+
+The high-level planner is responsible for the global question of \emph{which way around the fixed warehouse structure} the vehicle should travel to reach its current goal, ignoring transient obstacles. It is implemented by \texttt{VisGraphPlanner} as a visibility-graph search over the static map. At construction the planner inflates every known obstacle rectangle by a fixed margin (\texttt{inflation}), takes the corners of the inflated rectangles as graph nodes, and precomputes which pairs of nodes are mutually visible, i.e.\ connectable by a straight segment that crosses no inflated obstacle. Inflating the obstacles before building the graph is what keeps the resulting routes clear of walls by roughly the vehicle's footprint, so the local planner is rarely handed a global waypoint that sits inside structure.
+
+At query time the planner first tests whether the goal is directly visible from the current position, in which case the route is the single goal point. Otherwise it connects the start and goal to their visible graph nodes and runs an A$^\star$ search over the augmented visibility graph, returning the sequence of corners followed by the goal. Two robustness provisions matter in practice. First, if either the start or the goal has no visible graph node -- for instance when the vehicle is momentarily inside an inflated region -- the planner falls back to the nearest node reachable by an uninflated line of sight, so a route is still produced rather than an empty path. Second, the planner caches its last route and reuses it while the goal has not moved by more than \texttt{change\_goal\_thresh}, discarding only the waypoints the vehicle has already passed; this avoids rerunning the graph search every step and keeps the committed route stable instead of oscillating between equal-cost alternatives. When no route can be found at all, the planner returns a degenerate path at the current position and logs a warning, leaving the vehicle stationary rather than moving blindly.
+
+\subsection{Local Planning and Obstacle Avoidance}
+\label{subsec:controllers-lowlevel}
+
+The low-level planner turns the next global waypoint into a short, collision-free path through everything the vehicle can currently see, including obstacles absent from the static map. It is implemented by \texttt{GridPlanner}, which maintains a small egocentric occupancy grid centred on the vehicle and rebuilt at roughly ten hertz. The grid is world-aligned rather than body-aligned, which lets the planner convert between grid pixels and world coordinates without a rotation and simplifies reasoning about obstacle motion. Each replanning cycle proceeds in five stages: build the raw grid, separate static structure from unknown obstacles, track the unknown obstacles over time, inflate the grid with padding, and search for a path.
+
+The raw grid is constructed by ray-tracing the lidar point cloud: cells along each beam up to its hit are marked free, the hit itself is marked occupied, and cells never touched by a beam remain unknown. Every occupied hit is then classified by \emph{map differencing} against the global map: a hit that coincides with a known wall (within \texttt{tolerance\_m}) is labelled static structure, while a hit with no counterpart in the map is treated as an \emph{unknown obstacle}, the category that captures moving agents such as people and forklifts. This separation is central to the design, because static structure and dynamic obstacles are inflated differently in the next stage.
+
+Unknown obstacle hits are passed through a cluster--track--label pipeline. The \texttt{ClusterExtractor} groups neighbouring hits into candidate objects, rejecting blobs too small to be real or too large to be anything but wall fragments. The \texttt{ObstacleTracker} associates clusters with persistent tracks across frames, maintains a short position history, and estimates each track's velocity with exponential smoothing, promoting a track to ``confirmed'' only after it has been seen for several consecutive frames and classifying it as moving once its speed exceeds a threshold. Where a camera detection overlaps a track's projected image position, the \texttt{YoloLabeler} attaches a sticky semantic label (person or forklift); tracks outside the camera frustum simply remain unlabelled and are still avoided on geometry alone. The padding stage then inflates the costmap: static structure and stationary obstacles receive a fixed circular margin, whereas a moving obstacle's footprint is additionally stamped ahead of it along its estimated heading, so the vehicle yields space into which the obstacle is predicted to travel rather than only where it currently is.
+
+Path search runs A$^\star$ from the grid centre to the goal cell over this padded costmap, where free, unknown and padded cells carry increasing traversal costs so the planner prefers open, known space but will cross padding or unknown cells when necessary. The goal handed to the search is the global waypoint projected onto the boundary of the vision radius when it lies beyond the grid, and if the projected goal cell is not traversable the planner relocates it to the nearest admissible cell by sweeping outward around the vision circle. A subtlety preserved here is that the vehicle's \emph{final} route goal may sit inside conservative wall padding and still be accepted, but it is never accepted inside padding generated by a tracked obstacle or a peer vehicle, which prevents one AGV from parking on top of another. The resulting cell path is finally resampled at a fixed spacing by \texttt{\_\_get\_waypoints} into evenly spaced world-frame waypoints for the controller to follow.
+
+Alongside the path, the planner publishes a \texttt{PlannerSafetyStatus} summarising the forward clearance to the nearest confirmed obstacle and to the nearest moving obstacle, measured from the vehicle footprint. This status is what couples perception to the motion-safety layer described next: it is computed only from confirmed tracks that lie ahead of the vehicle, so momentary or lateral detections do not needlessly halt progress.
+
+\subsection{Motion Control and Safety}
+\label{subsec:controllers-control}
+
+The \texttt{Control} module follows the local path with a proportional controller. It takes the first waypoint as the immediate target, computes the distance error $\rho$ and the heading error $\alpha$ between the state estimate and that waypoint, and derives a linear and an angular velocity from them. The linear velocity is scaled by $\cos\alpha$ so the vehicle slows when it is poorly aligned and drives at cruising speed when pointed at the target, the angular velocity is proportional to the heading error under \texttt{heading\_p\_gain}, and a small dead-zone suppresses angular jitter near zero error. Both velocities are clamped to configured maxima. A differential-drive conversion then turns the linear and angular velocity into individual wheel speeds and, if either wheel would exceed its limit, scales both down together so the requested curvature is preserved. This is the same actuation model validated in the earliest controller iterations and carried forward largely unchanged.
+
+Two safety mechanisms sit between the raw command and the motors. The \texttt{MovingObstacleSafetyLimiter} consumes the planner's safety status and applies a two-tier rule: inside a slowdown clearance it caps the linear speed to a low crawl, and inside a tighter stop clearance it commands a full stop. The stop is \emph{latched} -- once triggered it is held for at least \texttt{minimum\_stop\_hold\_s} and is only released when the forward clearance has recovered beyond a larger release threshold, which introduces hysteresis so the vehicle does not stutter between stopping and starting as an obstacle hovers near the boundary. Separately, a global emergency stop is honoured directly in the control loop: when an \texttt{emergency\_stop.flag} file is present in the logging directory, the command is overwritten with zero wheel velocities. This file is written and removed by the monitoring web application (\cref{sec:webapp}) and provides an operator-facing kill switch that is independent of the planning and safety logic. Because the flag lives on disk, a stale file could otherwise persist across runs and hold a vehicle stopped indefinitely; the controller therefore deletes any existing flag once, at startup, so every run begins in a moving state and only an emergency stop raised during that run can halt it.
+
+\subsection{Observed Behaviour and Limitations}
+\label{subsec:controllers-behaviour}
+
+The layered design produces a clear division of responsibilities that is visible in operation: the visibility-graph planner commits the vehicle to a stable global route around fixed structure, while the grid planner continuously deforms the local path around people and forklifts that the static map does not contain, and the safety limiter provides a last line of defence when an obstacle enters the stopping clearance directly ahead. Separating semantic labelling (vision) from obstacle geometry (lidar) means the vehicle degrades gracefully: with object detection disabled it still avoids every obstacle, losing only the predictive, heading-aware padding applied to obstacles it can classify as moving.
+
+Several limitations follow directly from the current design and are worth stating explicitly. Coordination between vehicles is entirely implicit: a peer AGV is perceived as just another unknown obstacle, with no communication of intent, so the fleet avoids collisions but does not actively deconflict routes, and a narrow corridor shared by two vehicles is resolved only reactively. The emergency stop, once raised during a run, is cleared only by the monitoring web application, so recovery from an operator halt depends on that external tool being available. Finally, the state estimate leans heavily on GPS being available and approximately correct; the snap-to-GPS safeguard bounds odometric drift but would itself propagate a large GPS error directly into the pose, since there is no third reference to arbitrate between the two.
+
+The descriptions above characterise the controller's behaviour qualitatively, as it follows from the design and the code; this report does not attach numerical performance figures to them. A quantitative evaluation would measure the success rate over a full route, the frequency and cause of safety stops, the localization error against the Webots ground-truth pose, and any deadlock between vehicles sharing a corridor, and is the natural next step once representative simulation runs are recorded through the logging infrastructure of \cref{sec:logger}.

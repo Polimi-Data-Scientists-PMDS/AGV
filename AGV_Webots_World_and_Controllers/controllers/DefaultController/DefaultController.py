@@ -76,6 +76,11 @@ class AGVSimulation:
         if not self.operational:
             return
 
+        # Start every run from a clean state: clear any stale emergency-stop
+        # flag left on disk by a previous run, so a leftover file cannot hold
+        # the vehicle stopped indefinitely.
+        self.__clear_emergency_stop()
+
         try:
             prev_state = self.localization.initial_state(
                 self.hardware.gps.get_initial_position(),
@@ -169,6 +174,13 @@ class AGVSimulation:
     @staticmethod
     def __emergency_stop_is_active():
         return os.path.isfile(os.path.join(LOGS_DIR, "emergency_stop.flag"))
+
+    @staticmethod
+    def __clear_emergency_stop():
+        try:
+            os.remove(os.path.join(LOGS_DIR, "emergency_stop.flag"))
+        except FileNotFoundError:
+            pass
 
 
 if __name__ == "__main__":

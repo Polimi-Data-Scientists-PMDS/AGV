@@ -98,7 +98,7 @@ class PlanningConfig:
     global_map_res = 0.2
     world_width = 80.0   # (m) Total width of your simulated/real world
     world_height = 80.0  # (m) Total height of your simulated/real world
-    tolerance_m = 0.1    # (m) map-matching tolerance for known wall LiDAR hits
+    tolerance_m = 0.4    # (m) map-matching tolerance for known wall LiDAR hits
 
 @dataclass(frozen=True)
 class HighLevelPlanningConfig(PlanningConfig):

@@ -1,48 +1,53 @@
 \babel@toc {english}{}\relax 
 \contentsline {section}{\numberline {1}Current Controller}{3}{section.1}%
-\contentsline {subsection}{\numberline {1.1}Architecture}{3}{subsection.1.1}%
-\contentsline {subsection}{\numberline {1.2}Planning and Control}{3}{subsection.1.2}%
-\contentsline {subsection}{\numberline {1.3}Observed Behaviour}{3}{subsection.1.3}%
-\contentsline {section}{\numberline {2}Previous Controller Iterations}{3}{section.2}%
-\contentsline {subsection}{\numberline {2.1}Initial Approach}{3}{subsection.2.1}%
-\contentsline {subsection}{\numberline {2.2}Lessons Learned}{6}{subsection.2.2}%
-\contentsline {section}{\numberline {3}Logging Infrastructure}{7}{section.3}%
-\contentsline {subsection}{\numberline {3.1}Service Architecture}{7}{subsection.3.1}%
-\contentsline {subsection}{\numberline {3.2}Data Model}{8}{subsection.3.2}%
-\contentsline {paragraph}{Simulations.}{8}{section*.2}%
-\contentsline {paragraph}{Events.}{8}{section*.3}%
-\contentsline {paragraph}{EventTelemetry.}{9}{section*.4}%
-\contentsline {subsection}{\numberline {3.3}Data Flow and Controller Integration}{9}{subsection.3.3}%
-\contentsline {subsection}{\numberline {3.4}Validation and Transactional Integrity}{10}{subsection.3.4}%
-\contentsline {subsection}{\numberline {3.5}Realtime Telemetry Mirror}{11}{subsection.3.5}%
-\contentsline {subsection}{\numberline {3.6}Server-Side Read API}{12}{subsection.3.6}%
-\contentsline {paragraph}{Endpoints and filtering.}{12}{section*.5}%
-\contentsline {paragraph}{Result limiting and ordering.}{12}{section*.6}%
-\contentsline {paragraph}{Consistency and concurrency.}{12}{section*.7}%
-\contentsline {paragraph}{Response caching and serialisation.}{12}{section*.8}%
-\contentsline {subsection}{\numberline {3.7}JSONL Mirror and Dashboard Integration}{13}{subsection.3.7}%
-\contentsline {subsection}{\numberline {3.8}Reliability Considerations}{13}{subsection.3.8}%
-\contentsline {subsection}{\numberline {3.9}Use in Evaluation}{14}{subsection.3.9}%
-\contentsline {section}{\numberline {4}Web Application}{14}{section.4}%
-\contentsline {subsection}{\numberline {4.1}User Interaction with the Web App}{15}{subsection.4.1}%
-\contentsline {subsubsection}{\numberline {4.1.1}Startup, Prerequisites, and Access}{15}{subsubsection.4.1.1}%
-\contentsline {subsubsection}{\numberline {4.1.2}Interaction Model and Available Features}{15}{subsubsection.4.1.2}%
-\contentsline {subsubsection}{\numberline {4.1.3}Main Operational Workflow}{16}{subsubsection.4.1.3}%
-\contentsline {subsection}{\numberline {4.2}Web App Architecture}{17}{subsection.4.2}%
-\contentsline {subsubsection}{\numberline {4.2.1}Current State and Architectural Style}{17}{subsubsection.4.2.1}%
-\contentsline {subsubsection}{\numberline {4.2.2}Frontend Composition}{17}{subsubsection.4.2.2}%
-\contentsline {subsubsection}{\numberline {4.2.3}Client Data and State Management}{18}{subsubsection.4.2.3}%
-\contentsline {subsubsection}{\numberline {4.2.4}Local API and Persistence Boundary}{19}{subsubsection.4.2.4}%
-\contentsline {subsubsection}{\numberline {4.2.5}Map Representation and Current Limitation}{20}{subsubsection.4.2.5}%
-\contentsline {subsection}{\numberline {4.3}Role of the Web App in the Overall Architecture}{20}{subsection.4.3}%
-\contentsline {subsubsection}{\numberline {4.3.1}Architectural Position and Dependencies}{20}{subsubsection.4.3.1}%
-\contentsline {subsubsection}{\numberline {4.3.2}Live Monitoring Flow}{20}{subsubsection.4.3.2}%
-\contentsline {subsubsection}{\numberline {4.3.3}Persistent Data Flow}{21}{subsubsection.4.3.3}%
-\contentsline {subsubsection}{\numberline {4.3.4}Goal Configuration Flow}{21}{subsubsection.4.3.4}%
-\contentsline {subsubsection}{\numberline {4.3.5}Global Motion-Inhibit Flow}{22}{subsubsection.4.3.5}%
-\contentsline {subsubsection}{\numberline {4.3.6}Integration Rationale and Failure Boundaries}{22}{subsubsection.4.3.6}%
-\contentsline {subsection}{\numberline {4.4}Future Developments}{23}{subsection.4.4}%
-\contentsline {subsubsection}{\numberline {4.4.1}Distributed Architecture for Physical Robots}{23}{subsubsection.4.4.1}%
-\contentsline {subsubsection}{\numberline {4.4.2}Extended Logging and Configuration Server}{23}{subsubsection.4.4.2}%
-\contentsline {subsubsection}{\numberline {4.4.3}MQTT Real-Time Communication}{23}{subsubsection.4.4.3}%
-\contentsline {subsubsection}{\numberline {4.4.4}Proposed Information Flows}{24}{subsubsection.4.4.4}%
+\contentsline {subsection}{\numberline {1.1}Architecture and Control Loop}{3}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Perception}{4}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Localization}{4}{subsection.1.3}%
+\contentsline {subsection}{\numberline {1.4}Goal and Route Management}{5}{subsection.1.4}%
+\contentsline {subsection}{\numberline {1.5}High-Level Planning}{5}{subsection.1.5}%
+\contentsline {subsection}{\numberline {1.6}Local Planning and Obstacle Avoidance}{6}{subsection.1.6}%
+\contentsline {subsection}{\numberline {1.7}Motion Control and Safety}{7}{subsection.1.7}%
+\contentsline {subsection}{\numberline {1.8}Observed Behaviour and Limitations}{7}{subsection.1.8}%
+\contentsline {section}{\numberline {2}Previous Controller Iterations}{8}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Initial Approach}{8}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Lessons Learned}{10}{subsection.2.2}%
+\contentsline {section}{\numberline {3}Logging Infrastructure}{11}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Service Architecture}{11}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Data Model}{12}{subsection.3.2}%
+\contentsline {paragraph}{Simulations.}{13}{section*.2}%
+\contentsline {paragraph}{Events.}{13}{section*.3}%
+\contentsline {paragraph}{EventTelemetry.}{14}{section*.4}%
+\contentsline {subsection}{\numberline {3.3}Data Flow and Controller Integration}{14}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Validation and Transactional Integrity}{15}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}Realtime Telemetry Mirror}{16}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Server-Side Read API}{16}{subsection.3.6}%
+\contentsline {paragraph}{Endpoints and filtering.}{16}{section*.5}%
+\contentsline {paragraph}{Result limiting and ordering.}{17}{section*.6}%
+\contentsline {paragraph}{Consistency and concurrency.}{17}{section*.7}%
+\contentsline {paragraph}{Response caching and serialisation.}{17}{section*.8}%
+\contentsline {subsection}{\numberline {3.7}JSONL Mirror and Dashboard Integration}{17}{subsection.3.7}%
+\contentsline {subsection}{\numberline {3.8}Reliability Considerations}{18}{subsection.3.8}%
+\contentsline {subsection}{\numberline {3.9}Use in Evaluation}{19}{subsection.3.9}%
+\contentsline {section}{\numberline {4}Web Application}{19}{section.4}%
+\contentsline {subsection}{\numberline {4.1}User Interaction with the Web App}{19}{subsection.4.1}%
+\contentsline {subsubsection}{\numberline {4.1.1}Startup, Prerequisites, and Access}{19}{subsubsection.4.1.1}%
+\contentsline {subsubsection}{\numberline {4.1.2}Interaction Model and Available Features}{20}{subsubsection.4.1.2}%
+\contentsline {subsubsection}{\numberline {4.1.3}Main Operational Workflow}{21}{subsubsection.4.1.3}%
+\contentsline {subsection}{\numberline {4.2}Web App Architecture}{21}{subsection.4.2}%
+\contentsline {subsubsection}{\numberline {4.2.1}Current State and Architectural Style}{21}{subsubsection.4.2.1}%
+\contentsline {subsubsection}{\numberline {4.2.2}Frontend Composition}{22}{subsubsection.4.2.2}%
+\contentsline {subsubsection}{\numberline {4.2.3}Client Data and State Management}{22}{subsubsection.4.2.3}%
+\contentsline {subsubsection}{\numberline {4.2.4}Local API and Persistence Boundary}{23}{subsubsection.4.2.4}%
+\contentsline {subsubsection}{\numberline {4.2.5}Map Representation and Current Limitation}{24}{subsubsection.4.2.5}%
+\contentsline {subsection}{\numberline {4.3}Role of the Web App in the Overall Architecture}{24}{subsection.4.3}%
+\contentsline {subsubsection}{\numberline {4.3.1}Architectural Position and Dependencies}{24}{subsubsection.4.3.1}%
+\contentsline {subsubsection}{\numberline {4.3.2}Live Monitoring Flow}{25}{subsubsection.4.3.2}%
+\contentsline {subsubsection}{\numberline {4.3.3}Persistent Data Flow}{25}{subsubsection.4.3.3}%
+\contentsline {subsubsection}{\numberline {4.3.4}Goal Configuration Flow}{26}{subsubsection.4.3.4}%
+\contentsline {subsubsection}{\numberline {4.3.5}Global Motion-Inhibit Flow}{26}{subsubsection.4.3.5}%
+\contentsline {subsubsection}{\numberline {4.3.6}Integration Rationale and Failure Boundaries}{26}{subsubsection.4.3.6}%
+\contentsline {subsection}{\numberline {4.4}Future Developments}{27}{subsection.4.4}%
+\contentsline {subsubsection}{\numberline {4.4.1}Distributed Architecture for Physical Robots}{27}{subsubsection.4.4.1}%
+\contentsline {subsubsection}{\numberline {4.4.2}Extended Logging and Configuration Server}{27}{subsubsection.4.4.2}%
+\contentsline {subsubsection}{\numberline {4.4.3}MQTT Real-Time Communication}{28}{subsubsection.4.4.3}%
+\contentsline {subsubsection}{\numberline {4.4.4}Proposed Information Flows}{28}{subsubsection.4.4.4}%
